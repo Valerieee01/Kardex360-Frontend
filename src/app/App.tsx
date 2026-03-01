@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useEffect, useState } from "react";
+import LoginPage from "../Modules/Login/LoginPage";
+import { authTokens } from "../app/Shared/http";
 import { 
   LayoutDashboard, 
   Package, 
@@ -38,6 +41,7 @@ import {
 } from 'recharts';
 import { Toaster, toast } from 'sonner';
 import { ImageWithFallback } from './components/figma/ImageWithFallback';
+import AppLayout from '../layout/AppLayout';
 
 // --- Types ---
 type Module = 'dashboard' | 'inventory' | 'sales' | 'transfers' | 'warehouses' | 'users' | 'roles' | 'settings' | 'reports';
@@ -85,7 +89,6 @@ const CHART_DATA = [
 ];
 
 // --- Components ---
-
 const SidebarItem = ({ 
   icon: Icon, 
   label, 
@@ -124,7 +127,7 @@ const StatCard = ({ label, value, icon: Icon, color }: { label: string, value: s
   </div>
 );
 
-const InventoryRow = ({ item }: { item: typeof INVENTORY_DATA[0] }) => (
+export const InventoryRow = ({ item }: { item: typeof INVENTORY_DATA[0] }) => (
   <tr className="hover:bg-gray-50/50 transition-colors border-b border-gray-100 last:border-0">
     <td className="px-6 py-4">
       <div className="w-12 h-12 rounded-lg overflow-hidden border border-gray-200">
@@ -160,6 +163,15 @@ export default function KardexApp() {
   // Forms states (simplified)
   const [showAddProduct, setShowAddProduct] = useState(false);
 
+  useEffect(() => {
+    const { accessToken } = authTokens.get();
+    setIsLoggedIn(!!accessToken);
+  }, []);
+
+  if (!isLoggedIn) {
+    return <LoginPage onLoginSuccess={() => setIsLoggedIn(true)} />;
+  }
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoggedIn(true);
@@ -167,325 +179,21 @@ export default function KardexApp() {
   };
 
   const handleLogout = () => {
+    authTokens.clear();
     setIsLoggedIn(false);
     toast.info('Sesión cerrada correctamente');
   };
 
   if (!isLoggedIn) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden border border-gray-100">
-          <div className="bg-blue-900 p-8 text-white text-center">
-            <div className="flex justify-center mb-4">
-              <div className="bg-white/20 p-4 rounded-2xl backdrop-blur-md">
-                <Package className="w-12 h-12 text-white" />
-              </div>
-            </div>
-            <h1 className="text-2xl font-bold">Kardex Pro</h1>
-            <p className="text-blue-100 mt-2">Sistema de Gestión de Inventario</p>
-          </div>
-          
-          <div className="p-8">
-            <form onSubmit={handleLogin} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Identificación / Usuario</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input 
-                    type="text" 
-                    required 
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-900 focus:border-transparent transition-all outline-none"
-                    placeholder="Ingrese su usuario"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
-                <div className="relative">
-                  <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input 
-                    type="password" 
-                    required 
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-900 focus:border-transparent transition-all outline-none"
-                    placeholder="••••••••"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-sm">
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-900 focus:ring-blue-900" />
-                  <span className="text-gray-600 group-hover:text-gray-900">Recordarme</span>
-                </label>
-                <a href="#" className="text-blue-700 hover:underline font-medium">¿Olvidó su contraseña?</a>
-              </div>
-
-              <button 
-                type="submit" 
-                className="w-full py-3.5 bg-blue-900 hover:bg-blue-800 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-900/20 active:scale-[0.98]"
-              >
-                Iniciar Sesión
-              </button>
-            </form>
-          </div>
-        </div>
-        <Toaster position="top-right" />
-      </div>
-    );
+    return <LoginPage onLoginSuccess={() => setIsLoggedIn(true)} />;
   }
 
+    return <AppLayout onLogout={() => setIsLoggedIn(false)} />;
+
+ /*
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
-      {/* Sidebar */}
-      <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-        <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="p-6 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-blue-900 p-2 rounded-lg">
-                <Package className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-xl font-bold text-gray-900">Kardex Pro</span>
-            </div>
-            <button className="lg:hidden text-gray-400" onClick={() => setIsSidebarOpen(false)}>
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
-            <SidebarItem icon={LayoutDashboard} label="Dashboard" active={currentModule === 'dashboard'} onClick={() => setCurrentModule('dashboard')} />
-            <SidebarItem icon={Package} label="Inventario" active={currentModule === 'inventory'} onClick={() => setCurrentModule('inventory')} />
-            <SidebarItem icon={ShoppingCart} label="Ventas" active={currentModule === 'sales'} onClick={() => setCurrentModule('sales')} />
-            <SidebarItem icon={ArrowLeftRight} label="Traspasos" active={currentModule === 'transfers'} onClick={() => setCurrentModule('transfers')} />
-            <SidebarItem icon={Warehouse} label="Bodegas" active={currentModule === 'warehouses'} onClick={() => setCurrentModule('warehouses')} />
-            <div className="my-4 border-t border-gray-100 pt-4">
-              <p className="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Administración</p>
-              <SidebarItem icon={Users} label="Usuarios" active={currentModule === 'users'} onClick={() => setCurrentModule('users')} />
-              <SidebarItem icon={ShieldCheck} label="Roles y Permisos" active={currentModule === 'roles'} onClick={() => setCurrentModule('roles')} />
-              <SidebarItem icon={BarChart3} label="Reportes" active={currentModule === 'reports'} onClick={() => setCurrentModule('reports')} />
-              <SidebarItem icon={Settings} label="Configuración" active={currentModule === 'settings'} onClick={() => setCurrentModule('settings')} />
-            </div>
-          </nav>
-
-          {/* User Profile Summary */}
-          <div className="p-4 border-t border-gray-100">
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-              <div className="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center text-white font-bold">
-                AK
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <p className="text-sm font-semibold text-gray-900 truncate">Admin Kardex</p>
-                <p className="text-xs text-gray-500 truncate">admin@kardex.com</p>
-              </div>
-              <button onClick={handleLogout} className="text-gray-400 hover:text-red-500 transition-colors">
-                <LogOut className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <header className="sticky top-0 z-40 bg-white border-b border-gray-200">
-          <div className="px-4 lg:px-8 h-16 flex items-center justify-between">
-            <button className="lg:hidden p-2 text-gray-500 hover:bg-gray-100 rounded-lg" onClick={() => setIsSidebarOpen(true)}>
-              <Menu className="w-6 h-6" />
-            </button>
-
-            <div className="flex-1 max-w-xl mx-4 lg:mx-0">
-              <div className="relative group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-900 transition-colors" />
-                <input 
-                  type="text" 
-                  placeholder="Buscar productos, ventas, referencias..."
-                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-900/10 focus:border-blue-900 transition-all outline-none text-sm"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 lg:gap-4">
-              <button className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg relative">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-              </button>
-              <div className="h-8 w-px bg-gray-200 mx-1 hidden sm:block"></div>
-              <div className="hidden sm:block text-right">
-                <p className="text-sm font-semibold text-gray-900">Admin Kardex</p>
-                <p className="text-xs text-emerald-600 font-medium">Administrador</p>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Dynamic Content */}
-        <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
-          {currentModule === 'dashboard' && (
-            <div className="space-y-8 max-w-7xl mx-auto">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
-                <p className="text-gray-500">Resumen general de operaciones del día.</p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard label="Total Productos" value="1,284" icon={Package} color="bg-blue-900" />
-                <StatCard label="Stock Disponible" value="45,200" icon={Warehouse} color="bg-emerald-500" />
-                <StatCard label="Ventas del Día" value="$2,450.00" icon={ShoppingCart} color="bg-indigo-600" />
-                <StatCard label="Traspasos Hoy" value="12" icon={ArrowLeftRight} color="bg-orange-500" />
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="font-bold text-gray-900">Movimientos Semanales</h3>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                        <span className="w-3 h-3 bg-blue-900 rounded-full"></span> Ventas
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                        <span className="w-3 h-3 bg-emerald-500 rounded-full"></span> Traspasos
-                      </div>
-                    </div>
-                  </div>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={CHART_DATA}>
-                        <defs>
-                          <linearGradient id="colorVentas" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#1e3a8a" stopOpacity={0.1}/>
-                            <stop offset="95%" stopColor="#1e3a8a" stopOpacity={0}/>
-                          </linearGradient>
-                          <linearGradient id="colorTraspasos" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#94a3b8'}} dy={10} />
-                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#94a3b8'}} />
-                        <RechartsTooltip 
-                          contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
-                        />
-                        <Area type="monotone" dataKey="ventas" stroke="#1e3a8a" strokeWidth={3} fillOpacity={1} fill="url(#colorVentas)" />
-                        <Area type="monotone" dataKey="traspasos" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorTraspasos)" />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-                  <h3 className="font-bold text-gray-900 mb-6">Últimos Movimientos</h3>
-                  <div className="space-y-6">
-                    {RECENT_MOVEMENTS.map((mv) => (
-                      <div key={mv.id} className="flex items-start gap-4">
-                        <div className={`mt-1 p-2 rounded-lg ${
-                          mv.type === 'venta' ? 'bg-blue-50 text-blue-600' : 
-                          mv.type === 'traspaso' ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600'
-                        }`}>
-                          {mv.type === 'venta' ? <ShoppingCart className="w-4 h-4" /> : 
-                           mv.type === 'traspaso' ? <ArrowLeftRight className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-900 truncate">{mv.product}</p>
-                          <p className="text-xs text-gray-500">{mv.date} • {mv.user}</p>
-                        </div>
-                        <div className="text-sm font-bold text-gray-900">
-                          {mv.type === 'venta' ? '-' : '+'}{mv.qty}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <button className="w-full mt-6 py-2.5 text-sm font-semibold text-blue-900 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
-                    Ver todos los movimientos
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {currentModule === 'inventory' && (
-            <div className="space-y-6 max-w-7xl mx-auto">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Inventario</h2>
-                  <p className="text-gray-500">Gestione sus productos y niveles de stock.</p>
-                </div>
-                <button 
-                  onClick={() => setShowAddProduct(true)}
-                  className="flex items-center justify-center gap-2 bg-blue-900 hover:bg-blue-800 text-white px-4 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-blue-900/10 active:scale-95"
-                >
-                  <Plus className="w-5 h-5" />
-                  Agregar Producto
-                </button>
-              </div>
-
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-gray-100 bg-gray-50/30 flex flex-wrap items-center gap-4">
-                  <div className="flex-1 min-w-[200px] relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input 
-                      type="text" 
-                      placeholder="Filtrar por referencia o descripción..." 
-                      className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-900/10 focus:border-blue-900 transition-all outline-none text-sm"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <select className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-900/10">
-                      <option>Todas las Bodegas</option>
-                      {WAREHOUSES.map(b => <option key={b.code}>{b.name}</option>)}
-                    </select>
-                    <select className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-900/10">
-                      <option>Todos los Estados</option>
-                      <option>Activo</option>
-                      <option>Bajo Stock</option>
-                      <option>Inactivo</option>
-                    </select>
-                    <button className="p-2 text-gray-500 hover:bg-white border border-transparent hover:border-gray-200 rounded-lg transition-all">
-                      <Filter className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50/50 border-b border-gray-100">
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Imagen</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Referencia</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Descripción</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Talla</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Cantidad</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Bodega</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Estado</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {INVENTORY_DATA.map((item) => (
-                        <InventoryRow key={item.id} item={item} />
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
-                  <p className="text-sm text-gray-500">Mostrando 1-4 de 1,284 productos</p>
-                  <div className="flex items-center gap-2">
-                    <button className="px-3 py-1 border border-gray-200 rounded-md text-sm text-gray-600 disabled:opacity-50">Anterior</button>
-                    <button className="px-3 py-1 bg-blue-900 text-white rounded-md text-sm">1</button>
-                    <button className="px-3 py-1 border border-gray-200 rounded-md text-sm text-gray-600">2</button>
-                    <button className="px-3 py-1 border border-gray-200 rounded-md text-sm text-gray-600">Siguiente</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
+    
+        
           {currentModule === 'sales' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
               <div className="space-y-6">
@@ -594,7 +302,7 @@ export default function KardexApp() {
                     <div className="flex items-center justify-center hidden md:flex pt-8">
                        <ArrowLeftRight className="w-8 h-8 text-blue-900/20" />
                     </div>
-                    <div className="hidden md:block"></div> {/* Spacer */}
+                    <div className="hidden md:block"></div> {/* Spacer }
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Bodega Destino</label>
                       <select className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none">
@@ -864,7 +572,7 @@ export default function KardexApp() {
         </main>
       </div>
 
-      {/* Add Product Modal (Simple implementation) */}
+      {/* Add Product Modal (Simple implementation) }
       {showAddProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
            <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
@@ -926,4 +634,5 @@ export default function KardexApp() {
       <Toaster position="top-right" richColors />
     </div>
   );
+  */
 }
