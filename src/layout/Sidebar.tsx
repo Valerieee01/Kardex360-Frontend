@@ -10,6 +10,7 @@ import {
   BarChart3,
   LogOut,
   X,
+  Ruler,
 } from "lucide-react";
 import type { SessionUser } from "../app/Shared/session";
 import SidebarItem from "./SidebarItem";
@@ -57,6 +58,7 @@ export default function Sidebar({
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
           <SidebarItem icon={LayoutDashboard} label="Dashboard" active={currentModule === "dashboard"} onClick={() => onChangeModule("dashboard")} />
           <SidebarItem icon={Package} label="Inventario" active={currentModule === "inventory"} onClick={() => onChangeModule("inventory")} />
+          <SidebarItem icon={Ruler} label="Catálogo de Tallas" active={currentModule === 'sizes'} onClick={() => onChangeModule('sizes')} />
           <SidebarItem icon={ShoppingCart} label="Ventas" active={currentModule === "sales"} onClick={() => onChangeModule("sales")} />
           <SidebarItem icon={ArrowLeftRight} label="Traspasos" active={currentModule === "transfers"} onClick={() => onChangeModule("transfers")} />
           <SidebarItem icon={Warehouse} label="Bodegas" active={currentModule === "warehouses"} onClick={() => onChangeModule("warehouses")} />

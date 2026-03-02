@@ -1,13 +1,15 @@
 import DashboardPage from "../Modules/Dashboard/DashboardPage";
 import InventoryPage from "../Modules/Inventario/InventoryPage";
+import {SalesPage} from "../Modules/Movimientos/Ventas/VentsPage";
+import {TransfersPage} from "../Modules/Movimientos/Traspasos/TraspasosPage";
+import {WarehousesPage} from "../Modules/Bodegas/BodegasPage";
+import {SizesPage} from "../Modules/Tallas/TallasPage";
+import {UsersPage} from "../Modules/Usuarios/UsersPage";
+import {RolesPage} from "../Modules/Roles/RolesPage";
+import {ReportsPage} from "../Modules/Reportes/ReportesPage";
+import {SettingsPage} from "../Modules/Configuracion/ConfigurationPage";
+
 /*
-import SalesPage from "../modules/sales/SalesPage";
-import TransfersPage from "../modules/transfers/TransfersPage";
-import WarehousesPage from "../modules/warehouses/WarehousesPage";
-import UsersPage from "../modules/users/UsersPage";
-import RolesPage from "../modules/roles/RolesPage";
-import ReportsPage from "../modules/reports/ReportsPage";
-import SettingsPage from "../modules/settings/SettingsPage";
 */
 export type ModuleKey =
   | "dashboard"
@@ -18,7 +20,8 @@ export type ModuleKey =
   | "users"
   | "roles"
   | "reports"
-  | "settings";
+  | "settings"
+  | "sizes";
 
 type Props = {
   module: ModuleKey;
@@ -33,27 +36,38 @@ export default function ModuleRenderer({ module, searchQuery, onAddProduct }: Pr
 
     case "inventory":
       return <InventoryPage onAddProduct={onAddProduct} />;
-/*
+
     case "sales":
       return <SalesPage />;
 
     case "transfers":
       return <TransfersPage />;
 
+
     case "warehouses":
       return <WarehousesPage />;
 
-    case "users":
-      return <UsersPage />;
+   case "sizes":
+  return <SizesPage />;
+
+  case "users":
+    return <UsersPage />;
 
     case "roles":
       return <RolesPage />;
 
-    case "reports":
-      return <ReportsPage />;
+      case "reports":
+        return <ReportsPage />;
+        
+        case "settings":
+          return <SettingsPage />;
+        /*
+        
 
-    case "settings":
-      return <SettingsPage />;
+
+
+
+
 
     default:
       return <DashboardPage />;
