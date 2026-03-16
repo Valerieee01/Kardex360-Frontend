@@ -53,12 +53,12 @@ export default function InventoryPage({ onAddProduct }: { onAddProduct: () => vo
           <h2 className="text-2xl font-bold text-gray-900">Inventario</h2>
           <p className="text-gray-500">Gestione sus productos y niveles de stock.</p>
         </div>
-
+        
         <button
-           onClick={() => {
-    console.log("CLICK agregar producto");
-    onAddProduct();
-  }}
+          onClick={() => {
+            console.log("CLICK agregar producto");
+            onAddProduct();
+          }}
           className="flex items-center justify-center gap-2 bg-blue-900 hover:bg-blue-800 text-white px-4 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-blue-900/10 active:scale-95"
         >
           <Plus className="w-5 h-5" />

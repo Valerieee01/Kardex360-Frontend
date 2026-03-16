@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Package, Plus } from "lucide-react";
-import type { SettingsForm } from "./Copnfiguaton.types";
+import type { SettingsForm } from "./Configuaton.types";
 
 const DEFAULT_SETTINGS: SettingsForm = {
   nit: "900.123.456-7",
