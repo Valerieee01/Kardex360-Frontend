@@ -5,10 +5,8 @@ type Props = {
   roles: RoleItem[];
   roleId: string;
   onRoleChange: (roleId: string) => void;
-
   permissions: ModulePermission[];
   onToggle: (moduleKey: string, enabled: boolean) => void;
-
   onSave: () => void;
 };
 

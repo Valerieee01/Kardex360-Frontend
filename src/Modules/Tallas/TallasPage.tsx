@@ -1,80 +1,82 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-
 import { Plus } from "lucide-react";
+import { confirmDelete, successAlert, errorAlert } from "../../app/Shared/alerts";
+
 import { SizesToolbar } from "./Componentes/TallasToolBar";
 import { SizesTable } from "./Componentes/TallasTables";
-import type { SizeItem, SizeCategory, SizeStatus } from "./sizes.types";
-import { AddSizeModal, type CreateSizeInput } from "./Componentes/AddSizeModal";
-
-
-const SIZES_DATA: SizeItem[] = [
-  {
-    id: "1",
-    code: "S",
-    name: "Small",
-    category: "Ropa",
-    description: "Talla pequeña",
-    status: "Activo",
-  },
-  {
-    id: "2",
-    code: "M",
-    name: "Medium",
-    category: "Ropa",
-    description: "Talla mediana",
-    status: "Activo",
-  },
-  {
-    id: "3",
-    code: "42",
-    name: "42",
-    category: "Calzado",
-    description: "Talla 42",
-    status: "Inactivo",
-  },
-  {
-    id: "4",
-    code: "N/A",
-    name: "Sin talla",
-    category: "Ropa",
-    description: "No aplica",
-    status: "Activo",
-  },
-];
+import { AddSizeModal } from "./Componentes/AddSizeModal";
+import { EditSizeModal } from "./Componentes/EditSizeModal";
+import { sizesService } from "../../services/sizes.service";
+import type { SizeItem } from "./sizes.types";
 
 export function SizesPage() {
-      const [showAdd, setShowAdd] = useState(false);
-
+  const [showAdd, setShowAdd] = useState(false);
+  const [editingItem, setEditingItem] = useState<SizeItem | null>(null);
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<SizeCategory | "ALL">("ALL");
-  const [status, setStatus] = useState<SizeStatus | "ALL">("ALL");
+  const [sizes, setSizes] = useState<SizeItem[]>([]);
+  const [loading, setLoading] = useState(false);
 
-   const handleCreated = (created: CreateSizeInput) => {
-    toast.success("Talla creada");
-    // ✅ aquí luego actualizas tu estado o vuelves a llamar el GET /tallas/listar
-    console.log("Nueva talla:", created);
-  };
-
-  // paginación simple (mock)
   const pageSize = 4;
   const [page, setPage] = useState(1);
 
+  const loadSizes = async () => {
+    try {
+      setLoading(true);
+      const data = await sizesService.list();
+      setSizes(Array.isArray(data) ? data : []);
+    } catch (error: any) {
+      console.error("Error listando tallas:", error);
+      toast.error(error?.message || "No se pudieron cargar las tallas");
+      setSizes([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSizes();
+  }, []);
+
+  const handleCreated = (created: SizeItem) => {
+    setSizes((prev) => [created, ...prev]);
+    setPage(1);
+  };
+
+  const handleUpdated = (updated: SizeItem, previousTalla: string) => {
+    setSizes((prev) =>
+      prev.map((item) =>
+        item.talla === previousTalla ? { ...item, talla: updated.talla } : item
+      )
+    );
+  };
+
+  
+const handleDelete = async (item: SizeItem) => {
+  const ok = await confirmDelete(`Se eliminará la talla "${item.talla}"`);
+
+  if (!ok) return;
+
+  try {
+    await sizesService.remove(item.talla);
+
+    setSizes((prev) => prev.filter((x) => x.talla !== item.talla));
+
+    successAlert("Talla eliminada correctamente");
+  } catch (error: any) {
+    console.error("Error eliminando talla:", error);
+    errorAlert(error?.message || "No se pudo eliminar la talla");
+  }
+};
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const safeSizes = Array.isArray(sizes) ? sizes : [];
 
-    return SIZES_DATA.filter((s) => {
-      const matchesQuery =
-        !q ||
-        s.code.toLowerCase().includes(q) ||
-        s.name.toLowerCase().includes(q);
-
-      const matchesCategory = category === "ALL" ? true : s.category === category;
-      const matchesStatus = status === "ALL" ? true : s.status === status;
-
-      return matchesQuery && matchesCategory && matchesStatus;
-    });
-  }, [query, category, status]);
+    return safeSizes.filter((s) =>
+      !q ? true : (s.talla ?? "").toLowerCase().includes(q)
+    );
+  }, [query, sizes]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -82,59 +84,57 @@ export function SizesPage() {
   const end = start + pageSize;
   const pageRows = filtered.slice(start, end);
 
-  // si cambian filtros y quedas en página inválida
-  React.useEffect(() => {
+  useEffect(() => {
     setPage(1);
-  }, [query, category, status]);
+  }, [query]);
 
-  const handleCreate = () => {
-    // luego lo conectamos a un modal (igual que AddProductModal)
-    console.log("Crear talla");
-  };
-
-  const handleEdit = (item: SizeItem) => {
-    console.log("Editar", item);
-  };
-
-  const handleDelete = (item: SizeItem) => {
-    console.log("Eliminar", item);
-  };
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   return (
-   
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Catálogo de Tallas</h2>
-          <p className="text-gray-500">Administre las tallas disponibles para sus productos.</p>
+          <p className="text-gray-500">
+            Administre las tallas disponibles para sus productos.
+          </p>
         </div>
 
-         <button
-        onClick={() => setShowAdd(true)}
-        className="bg-blue-900 text-white px-4 py-2.5 rounded-xl font-semibold flex items-center gap-2"
-      >
-        <Plus className="w-5 h-5" /> Crear Talla
-      </button>
+        <button
+          onClick={() => setShowAdd(true)}
+          className="bg-blue-900 text-white px-4 py-2.5 rounded-xl font-semibold flex items-center gap-2"
+        >
+          <Plus className="w-5 h-5" />
+          Crear Talla
+        </button>
+      </div>
 
       <AddSizeModal
         open={showAdd}
         onClose={() => setShowAdd(false)}
         onCreated={handleCreated}
+        loading={loading}
       />
-    
-      </div>
+
+      <EditSizeModal
+        open={!!editingItem}
+        item={editingItem}
+        onClose={() => setEditingItem(null)}
+        onUpdated={handleUpdated}
+      />
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <SizesToolbar
-          query={query}
-          onQueryChange={setQuery}
-          category={category}
-          onCategoryChange={setCategory}
-          status={status}
-          onStatusChange={setStatus}
-        />
+        <SizesToolbar query={query} onQueryChange={setQuery} />
 
-        <SizesTable rows={pageRows} onEdit={handleEdit} onDelete={handleDelete} />
+        <SizesTable
+          rows={pageRows}
+          onEdit={(item) => setEditingItem(item)}
+          onDelete={handleDelete}
+        />
 
         <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
           <p className="text-sm text-gray-500">
@@ -151,8 +151,7 @@ export function SizesPage() {
               Anterior
             </button>
 
-            {/* Botones simples 1..totalPages (máx 5) */}
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => i + 1).map((p) => (
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
               <button
                 key={p}
                 onClick={() => setPage(p)}

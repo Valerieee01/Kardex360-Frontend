@@ -7,7 +7,7 @@ import Sidebar from "./Sidebar";
 import HeaderBar from "./HeaderBar";
 import ModuleRenderer, { type ModuleKey } from "./ModuleRender";
 import AddProductModal from "../Modules/Inventario/AddProductModal";
-import { WAREHOUSES } from "../Modules/Inventario/InventoryPage";
+import {  } from "../Modules/Inventario/InventoryPage";
 
 type Props = {
   onLogout: () => void;
@@ -66,12 +66,7 @@ export default function AppLayout({ onLogout }: Props) {
         </main>
       </div>
 
-      {/* ✅ AQUÍ ESTÁ EL MODAL */}
-      <AddProductModal
-        open={showAddProduct}
-        onClose={() => setShowAddProduct(false)}
-        warehouses={WAREHOUSES}
-      />
+ 
 
       <Toaster position="top-right" />
     </div>

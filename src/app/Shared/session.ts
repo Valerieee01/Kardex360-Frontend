@@ -2,6 +2,7 @@ export type SessionUser = {
   id: string;
   nombre: string;
   roles: string[];
+  permisos?: string[];
 };
 
 const USER_KEY = "kardex.user";
@@ -14,6 +15,10 @@ export function getStoredUser(): SessionUser | null {
   } catch {
     return null;
   }
+}
+
+export function setStoredUser(user: SessionUser) {
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
 export function clearStoredUser() {

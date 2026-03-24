@@ -6,6 +6,7 @@ import {
   YAxis,
   Tooltip as RechartsTooltip,
   Bar,
+  Legend,
 } from "recharts";
 
 import type { ReportChartRow } from "../Reportes.types";
@@ -43,23 +44,34 @@ export function ReportsChart({ data }: Props) {
             contentStyle={{
               borderRadius: "12px",
               border: "none",
-              boxShadow:
-                "0 10px 15px -3px rgb(0 0 0 / 0.1)",
+              boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
             }}
           />
 
+          <Legend />
+
           <Bar
             dataKey="ventas"
+            name="Ventas"
             fill="#1e3a8a"
             radius={[4, 4, 0, 0]}
-            barSize={40}
+            barSize={24}
           />
 
           <Bar
             dataKey="traspasos"
+            name="Traspasos"
             fill="#10b981"
             radius={[4, 4, 0, 0]}
-            barSize={40}
+            barSize={24}
+          />
+
+          <Bar
+            dataKey="entradas"
+            name="Entradas"
+            fill="#f59e0b"
+            radius={[4, 4, 0, 0]}
+            barSize={24}
           />
         </BarChart>
       </ResponsiveContainer>

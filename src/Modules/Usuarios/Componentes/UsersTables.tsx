@@ -3,10 +3,10 @@ import type { UserItem } from "../users.types";
 type Props = {
   users: UserItem[];
   onEdit: (user: UserItem) => void;
-  onDelete: (user: UserItem) => void;
+  onToggleStatus: (user: UserItem) => void;
 };
 
-export function UsersTable({ users, onEdit, onDelete }: Props) {
+export function UsersTable({ users, onEdit, onToggleStatus }: Props) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <table className="w-full text-left">
@@ -22,8 +22,8 @@ export function UsersTable({ users, onEdit, onDelete }: Props) {
 
         <tbody className="divide-y divide-gray-100">
           {users.map((u) => (
-            <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
-              <td className="px-6 py-4 font-mono text-sm text-gray-500">{u.id}</td>
+            <tr key={u.identificacion} className="hover:bg-gray-50/50 transition-colors">
+              <td className="px-6 py-4 font-mono text-sm text-gray-500">{u.identificacion}</td>
 
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
@@ -40,7 +40,13 @@ export function UsersTable({ users, onEdit, onDelete }: Props) {
               <td className="px-6 py-4 text-gray-600">{u.role}</td>
 
               <td className="px-6 py-4">
-                <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">
+                <span
+                  className={`px-2 py-1 text-xs font-bold rounded-full ${
+                    u.status === "Activo"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-red-100 text-red-700"
+                  }`}
+                >
                   {u.status}
                 </span>
               </td>
@@ -54,10 +60,14 @@ export function UsersTable({ users, onEdit, onDelete }: Props) {
                 </button>
 
                 <button
-                  onClick={() => onDelete(u)}
-                  className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  onClick={() => onToggleStatus(u)}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    u.status === "Activo"
+                      ? "text-red-600 hover:bg-red-50"
+                      : "text-emerald-600 hover:bg-emerald-50"
+                  }`}
                 >
-                  Eliminar
+                  {u.status === "Activo" ? "Inactivar" : "Activar"}
                 </button>
               </td>
             </tr>

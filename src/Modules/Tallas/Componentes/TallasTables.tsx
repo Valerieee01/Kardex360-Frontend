@@ -12,34 +12,22 @@ export function SizesTable({ rows, onEdit, onDelete }: Props) {
       <table className="w-full text-left border-collapse">
         <thead>
           <tr className="bg-gray-50/50 border-b border-gray-100">
-            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Código</th>
-            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Nombre</th>
-            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Categoría</th>
-            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Descripción</th>
-            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Estado</th>
-            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Acciones</th>
+            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">
+              Talla
+            </th>
+            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">
+              Acciones
+            </th>
           </tr>
         </thead>
 
         <tbody>
-          {rows.map((item) => (
-            <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-              <td className="px-6 py-4 font-medium text-gray-900">{item.code}</td>
-              <td className="px-6 py-4 text-gray-600">{item.name}</td>
-              <td className="px-6 py-4 text-gray-600">{item.category}</td>
-              <td className="px-6 py-4 text-gray-600">{item.description}</td>
-              <td className="px-6 py-4">
-                <span
-                  className={
-                    "px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider " +
-                    (item.status === "Activo"
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-amber-100 text-amber-700")
-                  }
-                >
-                  {item.status}
-                </span>
-              </td>
+          {rows.map((item, index) => (
+            <tr
+              key={item.id ?? `${item.talla}-${index}`}
+              className="hover:bg-gray-50/50 transition-colors"
+            >
+              <td className="px-6 py-4 font-medium text-gray-900">{item.talla}</td>
               <td className="px-6 py-4 text-right space-x-2">
                 <button
                   onClick={() => onEdit(item)}
@@ -59,7 +47,7 @@ export function SizesTable({ rows, onEdit, onDelete }: Props) {
 
           {rows.length === 0 && (
             <tr>
-              <td colSpan={6} className="px-6 py-10 text-center text-sm text-gray-500">
+              <td colSpan={2} className="px-6 py-10 text-center text-sm text-gray-500">
                 No hay tallas para mostrar.
               </td>
             </tr>

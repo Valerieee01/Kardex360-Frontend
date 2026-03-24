@@ -2,34 +2,26 @@ import React, { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 import { sizesService } from "../../../services/sizes.service";
-import type { CreateSizeInput, SizeItem } from "../sizes.types";
+import type { SizeItem } from "../sizes.types";
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onCreated?: (created: SizeItem) => void;
-  loading?: boolean;
+  item: SizeItem | null;
+  onUpdated?: (updated: SizeItem, previousTalla: string) => void;
 };
 
-const DEFAULT_FORM: CreateSizeInput = {
-  talla: "",
-};
-
-export function AddSizeModal({ open, onClose, onCreated, loading }: Props) {
-  const [form, setForm] = useState<CreateSizeInput>(DEFAULT_FORM);
+export function EditSizeModal({ open, onClose, item, onUpdated }: Props) {
+  const [talla, setTalla] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const isBusy = !!loading || saving;
-
-  const canSave = useMemo(() => {
-    return form.talla.trim().length > 0;
-  }, [form.talla]);
+  const canSave = useMemo(() => talla.trim().length > 0, [talla]);
 
   useEffect(() => {
-    if (!open) return;
-    setForm(DEFAULT_FORM);
+    if (!open || !item) return;
+    setTalla(item.talla);
     setSaving(false);
-  }, [open]);
+  }, [open, item]);
 
   useEffect(() => {
     if (!open) return;
@@ -42,23 +34,23 @@ export function AddSizeModal({ open, onClose, onCreated, loading }: Props) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !item) return null;
 
   const handleSave = async () => {
-    if (!canSave || isBusy) return;
+    if (!canSave || saving) return;
 
     setSaving(true);
     try {
-      const created = await sizesService.create({
-        talla: form.talla.trim(),
+      const updated = await sizesService.update(item.talla, {
+        talla: talla.trim(),
       });
 
-      onCreated?.(created);
-      toast.success("Talla creada correctamente");
+      onUpdated?.(updated, item.talla);
+      toast.success("Talla actualizada correctamente");
       onClose();
     } catch (error: any) {
-      console.error("Error creando talla:", error);
-      toast.error(error?.message || "No se pudo guardar la talla");
+      console.error("Error actualizando talla:", error);
+      toast.error(error?.message || "No se pudo actualizar la talla");
     } finally {
       setSaving(false);
     }
@@ -76,9 +68,9 @@ export function AddSizeModal({ open, onClose, onCreated, loading }: Props) {
         <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
           <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-bold text-gray-900">Crear nueva talla</h3>
+              <h3 className="text-lg font-bold text-gray-900">Editar talla</h3>
               <p className="text-sm text-gray-500">
-                Registra una talla disponible para productos.
+                Modifica el valor de la talla seleccionada.
               </p>
             </div>
 
@@ -97,8 +89,8 @@ export function AddSizeModal({ open, onClose, onCreated, loading }: Props) {
                 Talla *
               </label>
               <input
-                value={form.talla}
-                onChange={(e) => setForm({ talla: e.target.value })}
+                value={talla}
+                onChange={(e) => setTalla(e.target.value)}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-900/10 focus:border-blue-900"
                 placeholder="Ej: S, M, 42, 65"
               />
@@ -114,7 +106,7 @@ export function AddSizeModal({ open, onClose, onCreated, loading }: Props) {
           <div className="px-6 py-5 border-t border-gray-100 flex items-center justify-end gap-3">
             <button
               onClick={onClose}
-              disabled={isBusy}
+              disabled={saving}
               className="px-5 py-2.5 rounded-xl font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-50"
             >
               Cancelar
@@ -122,10 +114,10 @@ export function AddSizeModal({ open, onClose, onCreated, loading }: Props) {
 
             <button
               onClick={handleSave}
-              disabled={!canSave || isBusy}
+              disabled={!canSave || saving}
               className="px-6 py-2.5 rounded-xl font-bold text-white bg-blue-900 disabled:opacity-50"
             >
-              {isBusy ? "Guardando..." : "Guardar Talla"}
+              {saving ? "Guardando..." : "Actualizar Talla"}
             </button>
           </div>
         </div>

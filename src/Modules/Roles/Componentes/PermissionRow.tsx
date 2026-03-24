@@ -10,7 +10,9 @@ export function PermissionRow({ mod, onToggle }: Props) {
     <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
       <div>
         <p className="font-bold text-gray-900">{mod.label}</p>
-        <p className="text-sm text-gray-500">{mod.enabled ? mod.description : "Sin Acceso"}</p>
+        <p className="text-sm text-gray-500">
+          {mod.enabled ? mod.description : "Sin Acceso"}
+        </p>
       </div>
 
       <label className="flex items-center gap-2 cursor-pointer">

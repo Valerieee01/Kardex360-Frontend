@@ -1,4 +1,6 @@
 import { http, authTokens } from "../../../app/Shared/http";
+import { getPermissionsByRole } from "../../../services/roles.service"
+import { setStoredUser } from "../../../app/Shared/session";
 
 export type LoginBody = {
   identification: string;
@@ -20,14 +22,29 @@ export type LoginResponse = {
 
 export async function login(body: LoginBody) {
   const res = await http.post<LoginResponse, LoginBody>("/auth/login", body, {
-    auth: false, // login NO lleva token
+    auth: false,
   });
 
-  // guardar token (lo usará tu http.ts automáticamente en las siguientes requests)
   authTokens.set({ accessToken: res.data.accessToken });
 
-  // opcional: guardar user (por si quieres mostrar nombre en UI)
-  localStorage.setItem("kardex.user", JSON.stringify(res.data.user));
+  const baseUser = res.data.user;
+
+  let permisos: string[] = [];
+
+  try {
+    const mainRole = baseUser.roles?.[0];
+
+    if (mainRole) {
+      permisos = await getPermissionsByRole(mainRole);
+    }
+  } catch (error) {
+    console.error("No se pudieron cargar los permisos del rol", error);
+  }
+
+  setStoredUser({
+    ...baseUser,
+    permisos,
+  });
 
   return res;
 }
