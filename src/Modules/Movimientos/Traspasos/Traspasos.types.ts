@@ -2,14 +2,17 @@ export type InventoryTransferItem = {
   id: string;
   ref: string;
   desc: string;
-  qty: number;
-  talla: string;
   valor_unitario: number;
 };
 
 export type Warehouse = {
   code: string;
   name: string;
+};
+
+export type SizeItem = {
+  value: string;
+  label: string;
 };
 
 export type TransferDetail = {

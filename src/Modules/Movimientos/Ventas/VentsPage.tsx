@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { SalesForm } from "./Componentes/VentasFrm";
 import { RecentSalesTable } from "./Componentes/VentasRecientesTables";
@@ -33,60 +33,75 @@ function formatDate(value?: string) {
   }).format(date);
 }
 
-function mapMovementsToRows(items: MovementApiItem[]): SaleRow[] {
-  return items.flatMap((mov, movIndex) => {
-    const detalles = Array.isArray(mov.movimiento_detalle) ? mov.movimiento_detalle : [];
+function getApiSuccess(response: any): boolean | undefined {
+  return response?.success ?? response?.data?.success;
+}
+
+function getApiMessage(response: any, fallback: string): string {
+  return response?.message ?? response?.data?.message ?? fallback;
+}
+
+function normalizeMovementRows(items: MovementApiItem[]): SaleRow[] {
+  const rows: SaleRow[] = [];
+
+  for (const mov of items) {
+    const detalles = Array.isArray(mov.movimiento_detalle)
+      ? mov.movimiento_detalle
+      : [];
+
+    const estadoTexto =
+      mov.estado === true
+        ? "ACTIVO"
+        : mov.estado === false
+        ? "ANULADO"
+        : String(mov.estado ?? "ACTIVO");
+
+    const warehouse =
+      mov.tipo === "VENTA"
+        ? mov.bodega_origen || "-"
+        : mov.bodega_destino || mov.bodega_origen || "-";
 
     if (detalles.length === 0) {
-      return [
-        {
-          id: `${mov.codigo_movimiento}-${movIndex}`,
-          codigo_movimiento: mov.codigo_movimiento,
-          tipo: mov.tipo,
-          responsable: mov.responsable,
-          ref: "-",
-          qty: 0,
-          price: 0,
-          total: 0,
-          warehouse:
-            mov.tipo === "VENTA"
-              ? mov.bodega_origen || "-"
-              : mov.bodega_destino || mov.bodega_origen || "-",
-          date: formatDate(mov.created_at || mov.fecha || mov.updated_at),
-          estado:
-            mov.estado === true
-              ? "ACTIVO"
-              : mov.estado === false
-              ? "ANULADO"
-              : String(mov.estado ?? "ACTIVO"),
-          observacion: mov.observacion,
-        },
-      ];
+      rows.push({
+        id: `${mov.codigo_movimiento}-0`,
+        codigo_movimiento: mov.codigo_movimiento,
+        tipo: mov.tipo,
+        responsable: mov.responsable,
+        ref: "-",
+        qty: 0,
+        price: 0,
+        total: 0,
+        warehouse,
+        date: formatDate(mov.fecha || mov.created_at || mov.updated_at),
+        estado: estadoTexto,
+        observacion: mov.observacion,
+      });
+      continue;
     }
 
-    return detalles.map((d, index) => ({
-      id: `${mov.codigo_movimiento}-${d.referencia}-${index}`,
-      codigo_movimiento: mov.codigo_movimiento,
-      tipo: mov.tipo,
-      responsable: mov.responsable,
-      ref: d.referencia || "-",
-      qty: Number(d.cantidad ?? 0),
-      price: Number(d.valor_unitario ?? 0),
-      total: Number(d.cantidad ?? 0) * Number(d.valor_unitario ?? 0),
-      warehouse:
-        mov.tipo === "VENTA"
-          ? mov.bodega_origen || "-"
-          : mov.bodega_destino || mov.bodega_origen || "-",
-      date: formatDate(mov.created_at || mov.fecha || mov.updated_at),
-      estado:
-        mov.estado === true
-          ? "ACTIVO"
-          : mov.estado === false
-          ? "ANULADO"
-          : String(mov.estado ?? "ACTIVO"),
-      observacion: mov.observacion,
-    }));
-  });
+    for (let index = 0; index < detalles.length; index++) {
+      const d = detalles[index];
+      const qty = Number(d.cantidad ?? 0);
+      const price = Number(d.valor_unitario ?? 0);
+
+      rows.push({
+        id: `${mov.codigo_movimiento}-${d.item ?? index}`,
+        codigo_movimiento: mov.codigo_movimiento,
+        tipo: mov.tipo,
+        responsable: mov.responsable,
+        ref: d.referencia || "-",
+        qty,
+        price,
+        total: qty * price,
+        warehouse,
+        date: formatDate(mov.fecha || mov.created_at || mov.updated_at),
+        estado: estadoTexto,
+        observacion: mov.observacion,
+      });
+    }
+  }
+
+  return rows;
 }
 
 export function SalesPage() {
@@ -94,6 +109,7 @@ export function SalesPage() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [sizes, setSizes] = useState<SizeItem[]>([]);
   const [movements, setMovements] = useState<MovementApiItem[]>([]);
+  const [tableRows, setTableRows] = useState<SaleRow[]>([]);
   const [filter, setFilter] = useState<"TODOS" | "VENTA" | "ENTRADA" | "TRASPASO">("TODOS");
   const [loading, setLoading] = useState(true);
   const [editingMovement, setEditingMovement] = useState<MovementApiItem | null>(null);
@@ -104,20 +120,27 @@ export function SalesPage() {
     try {
       setLoading(true);
 
-      const [productsData, warehousesData, sizesData, movementsData] = await Promise.all([
-        listProductsForMovementService(),
-        listWarehousesForMovementService(),
-        sizesService.list(),
-        listMovementsService(),
-      ]);
+      const [productsData, warehousesData, sizesData, movementsData] =
+        await Promise.all([
+          listProductsForMovementService(),
+          listWarehousesForMovementService(),
+          sizesService.list(),
+          listMovementsService(),
+        ]);
+
+      const normalized = normalizeMovementRows(movementsData);
 
       setInventory(productsData);
       setWarehouses(warehousesData);
       setSizes(sizesData);
       setMovements(movementsData);
+      setTableRows(normalized);
     } catch (error: any) {
-      console.error("ERROR CARGANDO MOVIMIENTOS:", error);
-      toast.error(error?.response?.data?.message || "No se pudieron cargar los movimientos.");
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "No se pudieron cargar los movimientos."
+      );
     } finally {
       setLoading(false);
     }
@@ -127,13 +150,22 @@ export function SalesPage() {
     selectedFilter?: "TODOS" | "VENTA" | "ENTRADA" | "TRASPASO"
   ) => {
     try {
-      const tipo = selectedFilter && selectedFilter !== "TODOS" ? selectedFilter : undefined;
+      const tipo =
+        selectedFilter && selectedFilter !== "TODOS"
+          ? selectedFilter
+          : undefined;
+
       const data = await listMovementsService(tipo);
-      console.log("MOVIMIENTOS BACKEND:", data);
+      const normalized = normalizeMovementRows(data);
+
       setMovements(data);
+      setTableRows(normalized);
     } catch (error: any) {
-      console.error("ERROR RECARGANDO MOVIMIENTOS:", error);
-      toast.error(error?.response?.data?.message || "No se pudo actualizar el listado.");
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "No se pudo actualizar el listado."
+      );
     }
   };
 
@@ -145,41 +177,52 @@ export function SalesPage() {
     reloadMovements(filter);
   }, [filter]);
 
-  const tableRows = useMemo(() => {
-    const rows = mapMovementsToRows(movements);
-    console.log("ROWS TABLA:", rows);
-    return rows;
-  }, [movements]);
-
   const handleSubmitMovement = async (
     payload: CreateMovementPayload,
     editingCode?: string
   ) => {
     try {
+      let response: any;
+
       if (editingCode) {
-        await updateMovementService(editingCode, payload);
-        toast.success("Movimiento actualizado con éxito.");
-        setEditingMovement(null);
+        response = await updateMovementService(editingCode, payload);
       } else {
-        await createMovementService(payload);
-        toast.success(
-          payload.tipo === "VENTA"
-            ? "Venta registrada con éxito."
-            : "Entrada registrada con éxito."
-        );
+        response = await createMovementService(payload);
       }
 
+      const success = getApiSuccess(response);
+      const message = getApiMessage(
+        response,
+        editingCode
+          ? "Movimiento actualizado con éxito."
+          : payload.tipo === "VENTA"
+          ? "Venta registrada con éxito."
+          : "Entrada registrada con éxito."
+      );
+
+      if (success === false) {
+        toast.error(message);
+        return;
+      }
+
+      toast.success(message);
+      setEditingMovement(null);
       await reloadMovements(filter);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "No se pudo guardar el movimiento.");
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "No se pudo guardar el movimiento."
+      );
       throw error;
     }
   };
 
   const handleEdit = (codigoMovimiento: string) => {
     const found = movements.find((m) => m.codigo_movimiento === codigoMovimiento);
+
     if (!found) {
-      toast.error("No se encontró el movimiento para editar.");
+      toast.error("No se encontró el movimiento.");
       return;
     }
 
@@ -188,37 +231,42 @@ export function SalesPage() {
   };
 
   const handleAnnul = async (codigoMovimiento: string) => {
-    const motivo = window.prompt("Escribe el motivo de anulación:");
+    const motivo = window.prompt("Motivo de anulación:");
 
     if (!motivo || !motivo.trim()) {
-      toast.error("Debes ingresar un motivo para anular el movimiento.");
+      toast.error("Debes ingresar un motivo.");
       return;
     }
 
     try {
-      await annulMovementService(codigoMovimiento, motivo.trim());
-      toast.success("Movimiento anulado con éxito.");
+      const response: any = await annulMovementService(
+        codigoMovimiento,
+        motivo.trim()
+      );
 
-      if (editingMovement?.codigo_movimiento === codigoMovimiento) {
-        setEditingMovement(null);
+      const success = getApiSuccess(response);
+      const message = getApiMessage(response, "Movimiento anulado con éxito.");
+
+      if (success === false) {
+        toast.error(message);
+        return;
       }
 
+      toast.success(message);
+      setEditingMovement(null);
       await reloadMovements(filter);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "No se pudo anular el movimiento.");
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "No se pudo anular el movimiento."
+      );
     }
   };
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 max-w-7xl mx-auto">
       <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Movimientos de Inventario</h2>
-          <p className="text-gray-500">
-            Registra ventas o entradas con múltiples productos en un solo movimiento.
-          </p>
-        </div>
-
         <SalesForm
           inventory={inventory}
           warehouses={warehouses}
@@ -230,18 +278,9 @@ export function SalesPage() {
         />
       </div>
 
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Historial de movimientos</h2>
-          <p className="text-gray-500">
-            Consulta, filtra, edita o anula movimientos registrados.
-          </p>
-        </div>
-
+      <div>
         {loading ? (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center text-gray-500">
-            Cargando información...
-          </div>
+          <div className="p-6 text-center">Cargando...</div>
         ) : (
           <RecentSalesTable
             rows={tableRows}

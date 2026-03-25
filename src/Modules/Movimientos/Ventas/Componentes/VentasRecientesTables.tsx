@@ -15,6 +15,8 @@ export function RecentSalesTable({
   onEdit,
   onAnnul,
 }: Props) {
+  console.log("ROWS EN TABLA:", rows);
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="p-4 border-b border-gray-100 bg-gray-50/60 flex items-center justify-between gap-4">
@@ -45,6 +47,7 @@ export function RecentSalesTable({
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Tipo</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Ref</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Cant</th>
+              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Precio</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Total</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Bodega</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Estado</th>
@@ -56,7 +59,7 @@ export function RecentSalesTable({
           <tbody className="divide-y divide-gray-100">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-6 py-10 text-center text-gray-500">
+                <td colSpan={10} className="px-6 py-10 text-center text-gray-500">
                   No hay movimientos para mostrar.
                 </td>
               </tr>
@@ -67,7 +70,7 @@ export function RecentSalesTable({
                   <td className="px-6 py-4">
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        s.tipo === "VENTA"
+                        s.tipo === "VENTA" 
                           ? "bg-red-100 text-red-700"
                           : s.tipo === "ENTRADA"
                           ? "bg-emerald-100 text-emerald-700"
@@ -79,10 +82,9 @@ export function RecentSalesTable({
                   </td>
                   <td className="px-6 py-4 font-medium text-gray-900">{s.ref}</td>
                   <td className="px-6 py-4 text-gray-600">{s.qty}</td>
-                  <td className="px-6 py-4 font-bold text-gray-900">
-                    ${s.total.toLocaleString("es-CO")}
-                  </td>
-                  <td className="px-6 py-4 text-gray-600">{s.warehouse || "-"}</td>
+                  <td className="px-6 py-4 text-gray-600">${s.price.toLocaleString("es-CO")}</td>
+                  <td className="px-6 py-4 font-bold text-gray-900">${s.total.toLocaleString("es-CO")}</td>
+                  <td className="px-6 py-4 text-gray-600">{s.warehouse}</td>
                   <td className="px-6 py-4 text-gray-600">{s.estado}</td>
                   <td className="px-6 py-4 text-gray-500 text-right text-sm">{s.date}</td>
                   <td className="px-6 py-4">

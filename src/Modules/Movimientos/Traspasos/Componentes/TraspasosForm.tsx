@@ -1,14 +1,20 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ArrowLeftRight } from "lucide-react";
+import { toast } from "sonner";
+
 import type {
   CreateTransferPayload,
   InventoryTransferItem,
+  SizeItem,
   Warehouse,
 } from "../Traspasos.types";
+import { getCurrentUserId } from "../../../../app/Shared/auth";
 
 type Props = {
   inventory: InventoryTransferItem[];
   warehouses: Warehouse[];
+  sizes: SizeItem[];
+  responsable: string;
   loading?: boolean;
   onCancel: () => void;
   onSubmit: (payload: CreateTransferPayload) => Promise<void> | void;
@@ -17,29 +23,38 @@ type Props = {
 export function TransferForm({
   inventory,
   warehouses,
+  sizes,
+  responsable,
   loading = false,
   onCancel,
   onSubmit,
 }: Props) {
   const [productId, setProductId] = useState<string>("");
-  const [bodegaOrigen, setBodegaOrigen] = useState<string>(warehouses[0]?.code ?? "");
+  const [talla, setTalla] = useState<string>("");
+  const [bodegaOrigen, setBodegaOrigen] = useState<string>("");
   const [bodegaDestino, setBodegaDestino] = useState<string>("");
   const [cantidad, setCantidad] = useState<number>(0);
   const [observacion, setObservacion] = useState<string>("");
 
+  useEffect(() => {
+    if (!bodegaOrigen && warehouses.length > 0) {
+      setBodegaOrigen(warehouses[0].code);
+    }
+  }, [warehouses, bodegaOrigen]);
+
   const selectedProduct = useMemo(
-    () => inventory.find((p) => p.id === productId),
+    () => inventory.find((p) => String(p.id) === String(productId)),
     [inventory, productId]
   );
 
   const isInvalid =
-    !productId ||
+
+    !selectedProduct ||
+    !talla ||
     !bodegaOrigen ||
     !bodegaDestino ||
     bodegaOrigen === bodegaDestino ||
-    cantidad <= 0 ||
-    !selectedProduct ||
-    cantidad > selectedProduct.qty;
+    cantidad <= 0;
 
   const generarCodigoMovimiento = () => {
     const now = new Date();
@@ -52,40 +67,55 @@ export function TransferForm({
 
     return `MOV-TRA-${yyyy}${MM}${dd}${HH}${mm}${ss}`;
   };
+const handleSubmit = async () => {
+  if (!selectedProduct) return;
 
-  const handleSubmit = async () => {
-    if (!selectedProduct) return;
+  const currentUserId = getCurrentUserId();
 
-    const responsable =
-      localStorage.getItem("identificacion") ||
-      localStorage.getItem("userId") ||
-      localStorage.getItem("id_usuario") ||
-      localStorage.getItem("usuario") ||
-      "";
+  if (!currentUserId) {
+    toast.error("No se encontró el usuario activo.");
+    return;
+  }
 
-    const payload: CreateTransferPayload = {
-      codigo_movimiento: generarCodigoMovimiento(),
-      tipo: "TRASPASO",
-      responsable,
-      bodega_origen: bodegaOrigen,
-      bodega_destino: bodegaDestino,
-      observacion,
-      detalle: [
-        {
-          referencia: selectedProduct.ref,
-          talla: selectedProduct.talla,
-          cantidad,
-          valor_unitario: selectedProduct.valor_unitario,
-        },
-      ],
-    };
-
-    await onSubmit(payload);
+  const payload: CreateTransferPayload = {
+    codigo_movimiento: generarCodigoMovimiento(),
+    tipo: "TRASPASO",
+    responsable: currentUserId, // ✅ AQUÍ ESTÁ LA CLAVE
+    bodega_origen: bodegaOrigen,
+    bodega_destino: bodegaDestino,
+    observacion,
+    detalle: [
+      {
+        referencia: selectedProduct.ref,
+        talla,
+        cantidad,
+        valor_unitario: selectedProduct.valor_unitario,
+      },
+    ],
   };
+
+  await onSubmit(payload);
+};
+
+    const currentUserId = getCurrentUserId();
+  
 
   return (
     <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Responsable
+          </label>
+          <input
+            type="text"
+            value={currentUserId}
+            readOnly
+            className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl outline-none text-gray-600"
+            placeholder="Usuario activo"
+          />
+        </div>
+
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Seleccionar Producto
@@ -99,10 +129,44 @@ export function TransferForm({
             <option value="">Elija el producto a traspasar</option>
             {inventory.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.ref} - {p.desc} (Stock: {p.qty})
+                {p.ref} - {p.desc}
               </option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Talla
+          </label>
+          <select
+            value={talla}
+            onChange={(e) => setTalla(e.target.value)}
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+            disabled={loading}
+          >
+            <option value="">Seleccione talla</option>
+            {sizes.map((size) => (
+              <option key={size.value} value={size.value}>
+                {size.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Cantidad a Trasladar
+          </label>
+          <input
+            type="number"
+            min={1}
+            value={Number.isNaN(cantidad) ? 0 : cantidad}
+            onChange={(e) => setCantidad(Number(e.target.value))}
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+            placeholder="0"
+            disabled={loading || !selectedProduct}
+          />
         </div>
 
         <div>
@@ -155,39 +219,12 @@ export function TransferForm({
           )}
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Cantidad a Trasladar
-          </label>
-          <input
-            type="number"
-            min={1}
-            value={Number.isNaN(cantidad) ? 0 : cantidad}
-            onChange={(e) => setCantidad(Number(e.target.value))}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none"
-            placeholder="0"
-            disabled={loading}
-          />
-          {selectedProduct && cantidad > selectedProduct.qty && (
-            <p className="text-sm text-red-500 mt-2">
-              La cantidad supera el stock disponible ({selectedProduct.qty}).
-            </p>
-          )}
-        </div>
-
-        <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="md:col-span-2">
           <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
-            <p className="text-xs text-gray-500 mb-1">Talla</p>
+            <p className="text-xs text-gray-500 mb-1">Precio del producto seleccionado</p>
             <p className="font-semibold text-gray-800">
-              {selectedProduct?.talla || "-"}
-            </p>
-          </div>
-
-          <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
-            <p className="text-xs text-gray-500 mb-1">Valor unitario</p>
-            <p className="font-semibold text-gray-800">
-              {selectedProduct?.valor_unitario
-                ? `$ ${selectedProduct.valor_unitario.toLocaleString("es-CO")}`
+              {selectedProduct
+                ? `$ ${Number(selectedProduct.valor_unitario || 0).toLocaleString("es-CO")}`
                 : "-"}
             </p>
           </div>
