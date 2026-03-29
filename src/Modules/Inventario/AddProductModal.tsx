@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { X, Upload, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import type { ProductFormValues } from "./inventory.types";
 
@@ -25,15 +25,6 @@ const initialState: ProductFormValues = {
   estado: true,
 };
 
-function isValidUrl(value: string) {
-  try {
-    new URL(value);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export default function AddProductModal({
   open,
   onClose,
@@ -48,6 +39,7 @@ export default function AddProductModal({
   const [form, setForm] = useState<ProductFormValues>(initialState);
   const [errors, setErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -80,10 +72,42 @@ export default function AddProductModal({
           : value,
     }));
 
-    setErrors((prev) => ({
-      ...prev,
-      [name]: "",
-    }));
+    setErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  // Convierte el archivo seleccionado a base64 y lo guarda en form.imagen_url
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowedTypes.includes(file.type)) {
+      setErrors((prev) => ({
+        ...prev,
+        imagen_url: "Solo se permiten imágenes JPG, PNG, WEBP o GIF",
+      }));
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setErrors((prev) => ({
+        ...prev,
+        imagen_url: "La imagen no debe superar 2MB",
+      }));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      // reader.result → "data:image/png;base64,iVBORw0KGgo..."
+      // Este string se envía al backend y se usa directamente como src en <img>
+      setForm((prev) => ({ ...prev, imagen_url: reader.result as string }));
+      setErrors((prev) => ({ ...prev, imagen_url: "" }));
+    };
+    reader.readAsDataURL(file);
+
+    // Resetea el input para permitir volver a seleccionar el mismo archivo
+    e.target.value = "";
   };
 
   const validateForm = () => {
@@ -91,7 +115,6 @@ export default function AddProductModal({
 
     const referencia = form.referencia.trim();
     const descripcion = form.descripcion.trim();
-    const imagen = form.imagen_url.trim();
 
     if (!referencia) {
       newErrors.referencia = "La referencia es obligatoria";
@@ -110,16 +133,19 @@ export default function AddProductModal({
       newErrors.descripcion = "La descripción es obligatoria";
     }
 
-    if (form.precio_base === "" || form.precio_base === null || form.precio_base === undefined) {
+    if (
+      form.precio_base === "" ||
+      form.precio_base === null ||
+      form.precio_base === undefined
+    ) {
       newErrors.precio_base = "El precio base es obligatorio";
     } else if (Number(form.precio_base) < 0) {
       newErrors.precio_base = "El precio base no puede ser negativo";
     }
 
-    if (!imagen) {
+    // Ya no validamos URL — solo que exista el base64
+    if (!form.imagen_url) {
       newErrors.imagen_url = "La imagen es obligatoria";
-    } else if (!isValidUrl(imagen)) {
-      newErrors.imagen_url = "Debe ser una URL válida";
     }
 
     if (typeof form.estado !== "boolean") {
@@ -127,7 +153,6 @@ export default function AddProductModal({
     }
 
     setErrors(newErrors);
-
     return Object.keys(newErrors).length === 0;
   };
 
@@ -139,15 +164,13 @@ export default function AddProductModal({
 
     try {
       setLoading(true);
-
       await onSubmit({
         referencia: form.referencia.trim(),
         descripcion: form.descripcion.trim(),
-        imagen_url: form.imagen_url.trim(),
+        imagen_url: form.imagen_url, // base64 listo para enviar al backend
         precio_base: Number(form.precio_base),
         estado: form.estado,
       });
-
       onClose();
     } catch (error) {
       console.error(error);
@@ -158,25 +181,30 @@ export default function AddProductModal({
   };
 
   const inputClass = (field?: string) =>
-    `w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-900/10 focus:border-blue-900 ${
+    `w-full px-4 py-2.5 bg-gray-50 border rounded-xl outline-none focus:ring-2 focus:ring-blue-900/10 focus:border-blue-900 transition-colors ${
       field ? "border-red-400" : "border-gray-200"
     }`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden">
+
+        {/* Header */}
         <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-blue-900 text-white">
           <h3 className="text-xl font-bold">{title}</h3>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-lg"
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
             aria-label="Cerrar modal"
           >
             <X className="w-6 h-6" />
           </button>
         </div>
 
+        {/* Body */}
         <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          {/* Referencia */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Referencia <span className="text-red-500">*</span>
@@ -187,7 +215,7 @@ export default function AddProductModal({
               value={form.referencia}
               onChange={handleChange}
               disabled={disableReference}
-              className={`${inputClass(errors.referencia)} disabled:bg-gray-100`}
+              className={`${inputClass(errors.referencia)} disabled:bg-gray-100 disabled:cursor-not-allowed`}
               placeholder="REF-001"
             />
             {errors.referencia && (
@@ -195,6 +223,7 @@ export default function AddProductModal({
             )}
           </div>
 
+          {/* Precio Base */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Precio Base <span className="text-red-500">*</span>
@@ -214,6 +243,7 @@ export default function AddProductModal({
             )}
           </div>
 
+          {/* Descripción */}
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Descripción <span className="text-red-500">*</span>
@@ -231,23 +261,69 @@ export default function AddProductModal({
             )}
           </div>
 
+          {/* Imagen — file input con preview */}
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              URL de Imagen <span className="text-red-500">*</span>
+              Imagen <span className="text-red-500">*</span>
             </label>
+
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className={`relative flex flex-col items-center justify-center w-full h-44 border-2 border-dashed rounded-xl cursor-pointer transition-colors
+                ${
+                  errors.imagen_url
+                    ? "border-red-400 bg-red-50"
+                    : "border-gray-200 bg-gray-50 hover:border-blue-900 hover:bg-blue-50/30"
+                }`}
+            >
+              {form.imagen_url ? (
+                // Preview: funciona con base64 ("data:image/...") y con URLs externas
+                <img
+                  src={form.imagen_url}
+                  alt="Preview del producto"
+                  className="h-full w-full object-contain rounded-xl p-2"
+                />
+              ) : (
+                <div className="flex flex-col items-center gap-2 text-gray-400 select-none">
+                  <ImageIcon className="w-10 h-10" />
+                  <span className="text-sm font-medium">
+                    Haz clic para seleccionar una imagen
+                  </span>
+                  <span className="text-xs">PNG, JPG, WEBP, GIF · Máx 2MB</span>
+                </div>
+              )}
+
+              {/* Botón flotante para cambiar imagen si ya hay una */}
+              {form.imagen_url && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                  className="absolute bottom-2 right-2 flex items-center gap-1.5 px-3 py-1.5 bg-blue-900 text-white text-xs font-semibold rounded-lg shadow-lg hover:bg-blue-800 transition-colors"
+                >
+                  <Upload className="w-3 h-3" />
+                  Cambiar imagen
+                </button>
+              )}
+            </div>
+
+            {/* Input de archivo oculto */}
             <input
-              name="imagen_url"
-              type="text"
-              value={form.imagen_url}
-              onChange={handleChange}
-              className={inputClass(errors.imagen_url)}
-              placeholder="https://misitio.com/imagen.png"
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={handleFileChange}
             />
+
             {errors.imagen_url && (
               <p className="mt-1 text-sm text-red-600">{errors.imagen_url}</p>
             )}
           </div>
 
+          {/* Estado */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Estado <span className="text-red-500">*</span>
@@ -267,6 +343,7 @@ export default function AddProductModal({
           </div>
         </div>
 
+        {/* Footer */}
         <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
           <button
             onClick={onClose}
@@ -278,7 +355,7 @@ export default function AddProductModal({
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="px-8 py-2.5 bg-blue-900 text-white font-bold rounded-xl shadow-lg shadow-blue-900/10 hover:bg-blue-800 transition-all disabled:opacity-60"
+            className="px-8 py-2.5 bg-blue-900 text-white font-bold rounded-xl shadow-lg shadow-blue-900/10 hover:bg-blue-800 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {loading ? "Guardando..." : submitText}
           </button>

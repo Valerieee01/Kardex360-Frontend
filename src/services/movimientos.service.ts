@@ -35,7 +35,7 @@ export async function listProductsForMovementService() {
 
   const raw =
     (response.data as any)?.items ||
-    response.data||
+    response.data ||
     [];
 
   return (raw as ProductosResponseItem[]).map((item, index) => ({
@@ -63,15 +63,18 @@ export async function listWarehousesForMovementService() {
     .filter((item) => item.code && item.name);
 }
 
-export async function listMovementsService(tipo?: "VENTA" | "ENTRADA" | "TRASPASO") {
+export async function listMovementsService(
+  tipo?: "VENTA" | "ENTRADA" | "TRASPASO"
+) {
   const query = tipo ? `?tipo=${tipo}` : "";
-  const response = await http.get(`/movimientos/listar`);
 
-  const data =
-    response ||
-    [];
+  const response = await http.get<
+    ApiResponse<MovementApiItem[]>
+  >(`/movimientos/listar`);
 
-  return Array.isArray(data) ? (data as MovementApiItem[]) : [];
+  const data = response.data || [];
+
+  return data;
 }
 
 export async function createMovementService(payload: CreateMovementPayload) {
@@ -89,7 +92,7 @@ export async function annulMovementService(
   codigoMovimiento: string,
   motivo: string
 ) {
-  return await http.put(`/movimientos/${codigoMovimiento}/anular`, {
+  return await http.post(`/movimientos/${codigoMovimiento}/anular`, {
     codigo_movimiento: codigoMovimiento,
     motivo,
   });

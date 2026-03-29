@@ -7,7 +7,6 @@ import Sidebar from "./Sidebar";
 import HeaderBar from "./HeaderBar";
 import ModuleRenderer, { type ModuleKey } from "./ModuleRender";
 import AddProductModal from "../Modules/Inventario/AddProductModal";
-import {  } from "../Modules/Inventario/InventoryPage";
 
 type Props = {
   onLogout: () => void;
@@ -16,9 +15,8 @@ type Props = {
 export default function AppLayout({ onLogout }: Props) {
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [currentModule, setCurrentModule] = useState<ModuleKey>("dashboard");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // default cerrado en mobile
   const [searchQuery, setSearchQuery] = useState("");
-
   const [user, setUser] = useState<SessionUser | null>(null);
 
   useEffect(() => {
@@ -38,18 +36,41 @@ export default function AppLayout({ onLogout }: Props) {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
-      <Sidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        currentModule={currentModule}
-        onChangeModule={setCurrentModule}
-        user={user}
-        isAdmin={isAdmin}
-        onLogout={handleLogout}
-      />
+    <div className="flex h-screen overflow-hidden bg-[#F8FAFC]">
 
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Overlay para mobile */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black/40 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar: fijo en desktop, overlay en mobile */}
+      <aside
+        className={`
+          fixed inset-y-0 left-0 z-30 h-screen
+          transition-transform duration-300 ease-in-out
+          lg:relative lg:translate-x-0 lg:z-auto
+          ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
+        `}
+      >
+        <Sidebar
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          currentModule={currentModule}
+          onChangeModule={(mod) => {
+            setCurrentModule(mod);
+            setIsSidebarOpen(false); // cierra en mobile al navegar
+          }}
+          user={user}
+          isAdmin={isAdmin}
+          onLogout={handleLogout}
+        />
+      </aside>
+
+      {/* Contenido principal */}
+      <div className="flex flex-1 flex-col min-w-0 h-screen overflow-hidden">
         <HeaderBar
           onOpenSidebar={() => setIsSidebarOpen(true)}
           searchQuery={searchQuery}
@@ -57,7 +78,7 @@ export default function AppLayout({ onLogout }: Props) {
           user={user}
         />
 
-        <main className="p-4 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-4 lg:p-8">
           <ModuleRenderer
             module={currentModule}
             searchQuery={searchQuery}
@@ -65,8 +86,6 @@ export default function AppLayout({ onLogout }: Props) {
           />
         </main>
       </div>
-
- 
 
       <Toaster position="top-right" />
     </div>

@@ -9,7 +9,7 @@ import type {
 } from "../Modules/Reportes/Reportes.types";
 
 const api = axios.create({
-  baseURL: "http://localhost:3000/System/Inventory/Information",
+  baseURL: import.meta.env.VITE_API_URL,
 });
 
 function mapMovementType(type: ReportFilters["movementType"]) {
