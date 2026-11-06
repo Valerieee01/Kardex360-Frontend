@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { confirmDelete, successAlert, errorAlert } from "../../app/Shared/alerts";
 
 import { WarehouseCard } from "./Componentes/BodegasCards";
 import { AddWarehouseModal, type WarehouseCreateInput } from "./Componentes/AddBodegasModal";
+import { BodegaStockModal } from "./Componentes/BodegaStockModal";
 import type { WarehouseItem } from "./BodegasTypes";
 import { warehouseService } from "../../services/bodegas.service";
 
@@ -18,6 +19,8 @@ export function WarehousesPage({ onCreateWarehouse }: Props) {
 
   const [showModal, setShowModal] = useState(false);
   const [editingWarehouse, setEditingWarehouse] = useState<WarehouseItem | null>(null);
+
+  const [stockWarehouse, setStockWarehouse] = useState<WarehouseItem | null>(null);
 
  const loadWarehouses = async () => {
   try {
@@ -40,13 +43,15 @@ export function WarehousesPage({ onCreateWarehouse }: Props) {
 };
 
   const handleUpdate = async (updated: WarehouseCreateInput) => {
-  const warehouseUpdated = await warehouseService.update(updated.code!, updated);
-
-  setWarehouses((prev) =>
-    prev.map((w) => (w.code === updated.code ? warehouseUpdated : w))
-  );
-
-  toast.success("Bodega actualizada");
+  try {
+    const warehouseUpdated = await warehouseService.update(updated.code!, updated);
+    setWarehouses((prev) =>
+      prev.map((w) => (w.code === updated.code ? warehouseUpdated : w))
+    );
+    toast.success("Bodega actualizada");
+  } catch (error: any) {
+    errorAlert(error.message || "Error al actualizar la bodega");
+  }
 };
 
  const handleDelete = async (warehouse: WarehouseItem) => {
@@ -107,6 +112,12 @@ export function WarehousesPage({ onCreateWarehouse }: Props) {
         </button>
       </div>
 
+      <BodegaStockModal
+        open={!!stockWarehouse}
+        warehouse={stockWarehouse}
+        onClose={() => setStockWarehouse(null)}
+      />
+
       <AddWarehouseModal
         open={showModal}
         onClose={() => {
@@ -140,6 +151,7 @@ export function WarehousesPage({ onCreateWarehouse }: Props) {
               warehouse={w}
               onEdit={openEditModal}
               onDelete={handleDelete}
+              onViewStock={(warehouse) => setStockWarehouse(warehouse)}
             />
           ))}
         </div>

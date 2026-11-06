@@ -4,7 +4,7 @@ export type WarehouseItem = {
   name: string;
   location?: string;
   estado: boolean;
-  capacityPct?: number;
+  totalUnidades?: number;
 };
 
 export type WarehouseApi = {
@@ -13,4 +13,5 @@ export type WarehouseApi = {
   nombre_bodega: string;
   ubicacion?: string;
   estado: boolean;
+  total_unidades?: number;
 };

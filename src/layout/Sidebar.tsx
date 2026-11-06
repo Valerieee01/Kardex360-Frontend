@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Package, ShoppingCart, ArrowLeftRight,
   Warehouse, Users, ShieldCheck, Settings, BarChart3,
-  LogOut, X, Ruler,
+  LogOut, X, Ruler, PackagePlus, ClipboardList,
 } from "lucide-react";
 import type { SessionUser } from "../app/Shared/session";
 import SidebarItem from "./SidebarItem";
@@ -33,8 +33,9 @@ export default function Sidebar({
   const canReports = hasPermission(user, "PERM-REPORT");
   const canSettings = hasPermission(user, "PERM-CONFIG");
 
+  const canMovements = canSales || canTransfers || canInventory;
+
   return (
-    // ✅ Sin fixed, sin transform — AppLayout se encarga de eso
     <div className="w-64 h-full bg-white border-r border-gray-200 flex flex-col">
 
       {/* Logo */}
@@ -77,12 +78,30 @@ export default function Sidebar({
           />
         )}
 
+        {/* Sección Movimientos */}
+        {canMovements && (
+          <div className="pt-3 pb-1">
+            <p className="px-4 mb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              Movimientos
+            </p>
+          </div>
+        )}
+
         {canSales && (
           <SidebarItem
             icon={ShoppingCart}
             label="Ventas"
             active={currentModule === "sales"}
             onClick={() => onChangeModule("sales")}
+          />
+        )}
+
+        {canInventory && (
+          <SidebarItem
+            icon={PackagePlus}
+            label="Entradas de Stock"
+            active={currentModule === "entries"}
+            onClick={() => onChangeModule("entries")}
           />
         )}
 
@@ -95,6 +114,15 @@ export default function Sidebar({
           />
         )}
 
+        {canMovements && (
+          <SidebarItem
+            icon={ClipboardList}
+            label="Resumen Movimientos"
+            active={currentModule === "movements"}
+            onClick={() => onChangeModule("movements")}
+          />
+        )}
+
         {canInventory && (
           <SidebarItem
             icon={Warehouse}
@@ -104,6 +132,7 @@ export default function Sidebar({
           />
         )}
 
+        {/* Administración */}
         {(isAdmin || canReports || canSettings) && (
           <div className="my-4 border-t border-gray-100 pt-4">
             <p className="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">

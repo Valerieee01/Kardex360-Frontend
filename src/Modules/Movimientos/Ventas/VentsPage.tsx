@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import { ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import { SalesForm } from "./Componentes/VentasFrm";
-import { RecentSalesTable } from "./Componentes/VentasRecientesTables";
+import { MovimientosTableModal } from "../Componentes/MovimientosTableModal";
 import type {
   CreateMovementPayload,
   InventoryItem,
@@ -16,281 +17,183 @@ import {
   listMovementsService,
   listProductsForMovementService,
   listWarehousesForMovementService,
-  updateMovementService,
 } from "../../../services/movimientos.service";
 import { sizesService } from "../../../services/sizes.service";
 import { getCurrentUserId } from "../../../app/Shared/auth";
+import { normalizeMovementRows, getApiSuccess, getApiMessage, buildMovementCode } from "../movimientos.utils";
+import { confirmWithReason } from "../../../app/Shared/alerts";
 
-function formatDate(value?: string) {
-  if (!value) return "-";
+type Props = {
+  editingMovement?: MovementApiItem | null;
+  onClearEdit?: () => void;
+};
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return new Intl.DateTimeFormat("es-CO", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(date);
-}
-
-function getApiSuccess(response: any): boolean | undefined {
-  return response?.success ?? response?.data?.success;
-}
-
-function getApiMessage(response: any, fallback: string): string {
-  return response?.message ?? response?.data?.message ?? fallback;
-}
-
-function normalizeMovementRows(items: MovementApiItem[]): SaleRow[] {
-  const rows: SaleRow[] = [];
-
-  for (const mov of items) {
-    const detalles = Array.isArray(mov.movimiento_detalle)
-      ? mov.movimiento_detalle
-      : [];
-
-    const estadoTexto =
-      mov.estado === true
-        ? "ACTIVO"
-        : mov.estado === false
-        ? "ANULADO"
-        : String(mov.estado ?? "ACTIVO");
-
-    const warehouse =
-      mov.tipo === "VENTA"
-        ? mov.bodega_origen || "-"
-        : mov.bodega_destino || mov.bodega_origen || "-";
-
-    if (detalles.length === 0) {
-      rows.push({
-        id: `${mov.codigo_movimiento}-0`,
-        codigo_movimiento: mov.codigo_movimiento,
-        tipo: mov.tipo,
-        responsable: mov.responsable,
-        ref: "-",
-        qty: 0,
-        price: 0,
-        total: 0,
-        warehouse,
-        date: formatDate(mov.fecha || mov.created_at || mov.updated_at),
-        estado: estadoTexto,
-        observacion: mov.observacion,
-      });
-      continue;
-    }
-
-    for (let index = 0; index < detalles.length; index++) {
-      const d = detalles[index];
-      const qty = Number(d.cantidad ?? 0);
-      const price = Number(d.valor_unitario ?? 0);
-
-      rows.push({
-        id: `${mov.codigo_movimiento}-${d.item ?? index}`,
-        codigo_movimiento: mov.codigo_movimiento,
-        tipo: mov.tipo,
-        responsable: mov.responsable,
-        ref: d.referencia || "-",
-        qty,
-        price,
-        total: qty * price,
-        warehouse,
-        date: formatDate(mov.fecha || mov.created_at || mov.updated_at),
-        estado: estadoTexto,
-        observacion: mov.observacion,
-      });
-    }
-  }
-
-  return rows;
-}
-
-export function SalesPage() {
+export function SalesPage({ editingMovement: externalEditing, onClearEdit }: Props) {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [sizes, setSizes] = useState<SizeItem[]>([]);
-  const [movements, setMovements] = useState<MovementApiItem[]>([]);
   const [tableRows, setTableRows] = useState<SaleRow[]>([]);
-  const [filter, setFilter] = useState<"TODOS" | "VENTA" | "ENTRADA" | "TRASPASO">("TODOS");
+  const [inventoryMap, setInventoryMap] = useState<Map<string, { imagen_url: string; desc: string }>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [editingMovement, setEditingMovement] = useState<MovementApiItem | null>(null);
+  const [showTable, setShowTable] = useState(false);
+  const [internalEditing, setInternalEditing] = useState<MovementApiItem | null>(null);
+  const [isCorrection, setIsCorrection] = useState(false);
+  const [originalCode, setOriginalCode] = useState<string | undefined>();
 
+  const activeEditing = internalEditing ?? externalEditing ?? null;
   const currentUserId = getCurrentUserId();
 
   const loadInitialData = async () => {
     try {
       setLoading(true);
-
-      const [productsData, warehousesData, sizesData, movementsData] =
-        await Promise.all([
-          listProductsForMovementService(),
-          listWarehousesForMovementService(),
-          sizesService.list(),
-          listMovementsService(),
-        ]);
-
-      const normalized = normalizeMovementRows(movementsData);
-
+      const [productsData, warehousesData, sizesData, movementsData] = await Promise.all([
+        listProductsForMovementService(),
+        listWarehousesForMovementService(),
+        sizesService.list(),
+        listMovementsService("VENTA"),
+      ]);
+      const imgMap = new Map(productsData.map((p) => [p.ref, { imagen_url: p.imagen_url ?? "", desc: p.desc ?? "" }]));
       setInventory(productsData);
+      setInventoryMap(imgMap);
       setWarehouses(warehousesData);
       setSizes(sizesData);
-      setMovements(movementsData);
-      setTableRows(normalized);
+      setTableRows(normalizeMovementRows(movementsData, imgMap));
     } catch (error: any) {
-      toast.error(
-        error?.response?.data?.message ||
-          error?.message ||
-          "No se pudieron cargar los movimientos."
-      );
+      toast.error(error?.response?.data?.message || error?.message || "No se pudieron cargar los datos.");
     } finally {
       setLoading(false);
     }
   };
 
-  const reloadMovements = async (
-    selectedFilter?: "TODOS" | "VENTA" | "ENTRADA" | "TRASPASO"
-  ) => {
+  const reloadMovements = async () => {
     try {
-      const tipo =
-        selectedFilter && selectedFilter !== "TODOS"
-          ? selectedFilter
-          : undefined;
-
-      const data = await listMovementsService(tipo);
-      const normalized = normalizeMovementRows(data);
-
-      setMovements(data);
-      setTableRows(normalized);
+      const data = await listMovementsService("VENTA");
+      setTableRows(normalizeMovementRows(data, inventoryMap));
     } catch (error: any) {
-      toast.error(
-        error?.response?.data?.message ||
-          error?.message ||
-          "No se pudo actualizar el listado."
-      );
+      toast.error(error?.response?.data?.message || error?.message || "No se pudo actualizar el listado.");
     }
   };
 
-  useEffect(() => {
-    loadInitialData();
-  }, []);
+  useEffect(() => { loadInitialData(); }, []);
 
-  useEffect(() => {
-    reloadMovements(filter);
-  }, [filter]);
-
-  const handleSubmitMovement = async (
-    payload: CreateMovementPayload,
-    editingCode?: string
-  ) => {
+  const handleSubmitMovement = async (payload: CreateMovementPayload) => {
     try {
-      let response: any;
-
-      if (editingCode) {
-        response = await updateMovementService(editingCode, payload);
-      } else {
-        response = await createMovementService(payload);
-      }
-
+      const response: any = await createMovementService(payload);
       const success = getApiSuccess(response);
-      const message = getApiMessage(
-        response,
-        editingCode
-          ? "Movimiento actualizado con éxito."
-          : payload.tipo === "VENTA"
-          ? "Venta registrada con éxito."
-          : "Entrada registrada con éxito."
-      );
-
-      if (success === false) {
-        toast.error(message);
-        return;
-      }
-
+      const message = getApiMessage(response, "Venta registrada con éxito.");
+      if (success === false) { toast.error(message); return; }
       toast.success(message);
-      setEditingMovement(null);
-      await reloadMovements(filter);
+      setInternalEditing(null);
+      setIsCorrection(false);
+      setOriginalCode(undefined);
+      onClearEdit?.();
+      await reloadMovements();
     } catch (error: any) {
-      toast.error(
-        error?.response?.data?.message ||
-          error?.message ||
-          "No se pudo guardar el movimiento."
-      );
+      toast.error(error?.response?.data?.message || error?.message || "No se pudo guardar la venta.");
       throw error;
     }
   };
 
-  const handleEdit = (codigoMovimiento: string) => {
-    const found = movements.find((m) => m.codigo_movimiento === codigoMovimiento);
-
-    if (!found) {
-      toast.error("No se encontró el movimiento.");
-      return;
-    }
-
-    setEditingMovement(found);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handleAnnul = async (codigoMovimiento: string) => {
-    const motivo = window.prompt("Motivo de anulación:");
-
-    if (!motivo || !motivo.trim()) {
-      toast.error("Debes ingresar un motivo.");
-      return;
-    }
+  const handleCorrect = async (codigoMovimiento: string) => {
+    const motivo = await confirmWithReason(
+      "Corregir venta",
+      "Se anulará el movimiento original y se abrirá un formulario pre-llenado para que corrijas el error.",
+      "Ej: Bodega incorrecta..."
+    );
+    if (!motivo) return;
 
     try {
-      const response: any = await annulMovementService(
-        codigoMovimiento,
-        motivo.trim()
-      );
-
-      const success = getApiSuccess(response);
-      const message = getApiMessage(response, "Movimiento anulado con éxito.");
-
-      if (success === false) {
-        toast.error(message);
+      const annulRes: any = await annulMovementService(codigoMovimiento, motivo);
+      if (getApiSuccess(annulRes) === false) {
+        toast.error(getApiMessage(annulRes, "No se pudo anular el movimiento."));
         return;
       }
 
-      toast.success(message);
-      setEditingMovement(null);
-      await reloadMovements(filter);
+      const allData = await listMovementsService("VENTA");
+      const original = allData.find((m) => m.codigo_movimiento === codigoMovimiento);
+      if (!original) { toast.error("No se encontró el movimiento original."); return; }
+
+      setOriginalCode(codigoMovimiento);
+      setInternalEditing({ ...original, codigo_movimiento: buildMovementCode("VENTA") });
+      setIsCorrection(true);
+      await reloadMovements();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      toast.info("Movimiento anulado. Corrige los datos y confirma.");
     } catch (error: any) {
-      toast.error(
-        error?.response?.data?.message ||
-          error?.message ||
-          "No se pudo anular el movimiento."
-      );
+      toast.error(error?.response?.data?.message || error?.message || "No se pudo corregir el movimiento.");
     }
   };
 
+  const handleAnnul = async (codigoMovimiento: string) => {
+    const motivo = await confirmWithReason("Anular venta", "Indica el motivo de la anulación.");
+    if (!motivo) return;
+
+    try {
+      const response: any = await annulMovementService(codigoMovimiento, motivo);
+      const success = getApiSuccess(response);
+      const message = getApiMessage(response, "Venta anulada con éxito.");
+      if (success === false) { toast.error(message); return; }
+      toast.success(message);
+      setInternalEditing(null);
+      setIsCorrection(false);
+      setOriginalCode(undefined);
+      onClearEdit?.();
+      await reloadMovements();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || "No se pudo anular la venta.");
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setInternalEditing(null);
+    setIsCorrection(false);
+    setOriginalCode(undefined);
+    onClearEdit?.();
+  };
+
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 max-w-7xl mx-auto">
-      <div className="space-y-6">
-        <SalesForm
-          inventory={inventory}
-          warehouses={warehouses}
-          sizes={sizes}
-          currentUserId={currentUserId}
-          editingMovement={editingMovement}
-          onSubmit={handleSubmitMovement}
-          onCancelEdit={() => setEditingMovement(null)}
-        />
+    <div className="space-y-6 max-w-4xl mx-auto">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Ventas</h2>
+          <p className="text-gray-500">Registra ventas con múltiples referencias y tallas.</p>
+        </div>
+        <button
+          onClick={() => setShowTable(true)}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium shadow-sm"
+        >
+          <ClipboardList size={16} />
+          Ver historial
+          {tableRows.length > 0 && (
+            <span className="ml-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs font-semibold">
+              {tableRows.length}
+            </span>
+          )}
+        </button>
       </div>
 
-      <div>
-        {loading ? (
-          <div className="p-6 text-center">Cargando...</div>
-        ) : (
-          <RecentSalesTable
-            rows={tableRows}
-            filter={filter}
-            onChangeFilter={setFilter}
-            onEdit={handleEdit}
-            onAnnul={handleAnnul}
-          />
-        )}
-      </div>
+      <SalesForm
+        inventory={inventory}
+        warehouses={warehouses}
+        sizes={sizes}
+        currentUserId={currentUserId}
+        editingMovement={activeEditing}
+        isCorrection={isCorrection}
+        originalCode={originalCode}
+        onSubmit={handleSubmitMovement}
+        onCancelEdit={handleCancelEdit}
+      />
+
+      <MovimientosTableModal
+        open={showTable}
+        onClose={() => setShowTable(false)}
+        rows={tableRows}
+        filter="VENTA"
+        onEdit={handleCorrect}
+        onAnnul={handleAnnul}
+        title="Ventas registradas"
+        subtitle="Historial de ventas."
+      />
     </div>
   );
 }

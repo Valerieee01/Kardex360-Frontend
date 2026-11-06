@@ -2,6 +2,7 @@ export type ReportMovementType = "ALL" | "VENTAS" | "TRASPASOS" | "ENTRADAS";
 
 export type ReportFilters = {
   dateFrom: string;
+  dateTo: string;
   warehouse: string;
   userId: string;
   movementType: ReportMovementType;

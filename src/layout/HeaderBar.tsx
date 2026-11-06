@@ -1,15 +1,33 @@
-import { Bell, Menu, Search } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Bell, Menu, Clock } from "lucide-react";
 import type { SessionUser } from "../app/Shared/session";
 
 type Props = {
   onOpenSidebar: () => void;
-  searchQuery: string;
-  setSearchQuery: (v: string) => void;
   user: SessionUser | null;
 };
 
-export default function HeaderBar({ onOpenSidebar, searchQuery, setSearchQuery, user }: Props) {
+export default function HeaderBar({ onOpenSidebar, user }: Props) {
   const isAdmin = user?.roles?.includes("ROL-ADMIN");
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const fecha = now.toLocaleDateString("es-CO", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
+  const hora = now.toLocaleTimeString("es-CO", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-gray-200">
@@ -18,17 +36,14 @@ export default function HeaderBar({ onOpenSidebar, searchQuery, setSearchQuery, 
           <Menu className="w-6 h-6" />
         </button>
 
-        <div className="flex-1 max-w-xl mx-4 lg:mx-0">
-          <div className="relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-900 transition-colors" />
-            <input
-              type="text"
-              placeholder="Buscar productos, ventas, referencias..."
-              className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-900/10 focus:border-blue-900 transition-all outline-none text-sm"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+        {/* Fecha y hora en tiempo real */}
+        <div className="flex items-center gap-2 text-gray-500">
+          <Clock className="w-4 h-4 shrink-0" />
+          <div className="hidden sm:flex items-baseline gap-2">
+            <span className="text-sm text-gray-400 capitalize">{fecha}</span>
+            <span className="text-sm font-semibold text-gray-700 tabular-nums">{hora}</span>
           </div>
+          <span className="sm:hidden text-sm font-semibold text-gray-700 tabular-nums">{hora}</span>
         </div>
 
         <div className="flex items-center gap-2 lg:gap-4">

@@ -2,7 +2,6 @@ import { http } from "../app/Shared/http";
 import type {
   CreateTransferPayload,
   InventoryTransferItem,
-  SizeItem,
   Warehouse,
 } from "../Modules/Movimientos/Traspasos/Traspasos.types";
 
@@ -16,6 +15,7 @@ type ProductApiItem = {
   referencia: string;
   descripcion: string;
   precio_base?: string | number;
+  imagen_url?: string;
 };
 
 type WarehouseApiItem = {
@@ -23,12 +23,7 @@ type WarehouseApiItem = {
   code?: string;
   nombre_bodega?: string;
   name?: string;
-};
-
-type SizeApiItem = {
-  talla?: string;
-  nombre?: string;
-  descripcion?: string;
+  estado?: boolean;
 };
 
 function extractItems<T>(response: any): T[] {
@@ -59,6 +54,7 @@ export async function listProductsForTransferService(): Promise<InventoryTransfe
     ref: String(item.referencia ?? ""),
     desc: String(item.descripcion ?? ""),
     valor_unitario: toNumber(item.precio_base, 0),
+    imagen_url: item.imagen_url ?? "",
   }));
 }
 
@@ -69,26 +65,12 @@ export async function listWarehousesForTransferService(): Promise<Warehouse[]> {
 
   const items = extractItems<WarehouseApiItem>(response);
 
-  return items.map((item) => ({
-    code: String(item.codigo_bodega ?? item.code ?? ""),
-    name: String(item.nombre_bodega ?? item.name ?? ""),
-  }));
-}
-
-export async function listSizesForTransferService(): Promise<SizeItem[]> {
-  const response = await http.get<ApiResponse<SizeApiItem[]> | SizeApiItem[]>(
-    "/tallas/listar"
-  );
-
-  const items = extractItems<SizeApiItem>(response);
-
-  return items.map((item) => {
-    const talla = String(item.talla ?? item.nombre ?? item.descripcion ?? "");
-    return {
-      value: talla,
-      label: talla,
-    };
-  });
+  return items
+    .filter((item) => item.estado !== false)
+    .map((item) => ({
+      code: String(item.codigo_bodega ?? item.code ?? ""),
+      name: String(item.nombre_bodega ?? item.name ?? ""),
+    }));
 }
 
 export async function createTransferService(payload: CreateTransferPayload) {

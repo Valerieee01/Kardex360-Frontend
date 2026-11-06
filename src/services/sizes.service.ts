@@ -31,11 +31,25 @@ function normalizeSize(item: RawSize, index = 0): SizeItem {
   };
 }
 
+const MAX_PAGE_SIZE = 100;
+
 export const sizesService = {
   async list(): Promise<SizeItem[]> {
-    const response = await http.get<ListSizesResponse>("/tallas/listar");
-    const items = response?.data?.items ?? [];
-    return items.map((item, index) => normalizeSize(item, index));
+    const first = await http.get<ListSizesResponse>("/tallas/listar", {
+      params: { page: 1, limit: MAX_PAGE_SIZE },
+    });
+
+    const allRaw = [...(first?.data?.items ?? [])];
+    const totalPages = first?.data?.pages ?? 1;
+
+    for (let page = 2; page <= totalPages; page++) {
+      const response = await http.get<ListSizesResponse>("/tallas/listar", {
+        params: { page, limit: MAX_PAGE_SIZE },
+      });
+      allRaw.push(...(response?.data?.items ?? []));
+    }
+
+    return allRaw.map((item, index) => normalizeSize(item, index));
   },
 
   async create(payload: CreateSizeInput): Promise<SizeItem> {

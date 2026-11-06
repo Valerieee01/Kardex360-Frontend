@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast, Toaster } from "sonner";
 import { authTokens } from "../app/Shared/http";
 import { clearStoredUser, getStoredUser, type SessionUser } from "../app/Shared/session";
@@ -7,21 +8,36 @@ import Sidebar from "./Sidebar";
 import HeaderBar from "./HeaderBar";
 import ModuleRenderer, { type ModuleKey } from "./ModuleRender";
 import AddProductModal from "../Modules/Inventario/AddProductModal";
+import { SessionExpiredModal } from "./SessionExpiredModal";
+import type { MovementApiItem } from "../Modules/Movimientos/Ventas/ventas.types";
+import { MODULE_ROUTES, moduleFromPath } from "./layout.types";
 
 type Props = {
   onLogout: () => void;
 };
 
 export default function AppLayout({ onLogout }: Props) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [showAddProduct, setShowAddProduct] = useState(false);
-  const [currentModule, setCurrentModule] = useState<ModuleKey>("dashboard");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // default cerrado en mobile
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [editingMovement, setEditingMovement] = useState<MovementApiItem | null>(null);
+  const [showReauthModal, setShowReauthModal] = useState(false);
+
+  const currentModule: ModuleKey = moduleFromPath(location.pathname);
 
   useEffect(() => {
     const u = getStoredUser();
     setUser(u);
+  }, []);
+
+  useEffect(() => {
+    const handleReauthRequired = () => setShowReauthModal(true);
+    window.addEventListener("auth:reauth-required", handleReauthRequired);
+    return () => window.removeEventListener("auth:reauth-required", handleReauthRequired);
   }, []);
 
   const isAdmin = useMemo(() => {
@@ -35,10 +51,20 @@ export default function AppLayout({ onLogout }: Props) {
     onLogout();
   };
 
+  const handleNavigate = (module: ModuleKey, movement?: MovementApiItem) => {
+    setEditingMovement(movement ?? null);
+    navigate(MODULE_ROUTES[module]);
+  };
+
+  const handleChangeModule = (mod: ModuleKey) => {
+    setEditingMovement(null);
+    setIsSidebarOpen(false);
+    navigate(MODULE_ROUTES[mod]);
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-[#F8FAFC]">
 
-      {/* Overlay para mobile */}
       {isSidebarOpen && (
         <div
           className="fixed inset-0 z-20 bg-black/40 lg:hidden"
@@ -46,7 +72,6 @@ export default function AppLayout({ onLogout }: Props) {
         />
       )}
 
-      {/* Sidebar: fijo en desktop, overlay en mobile */}
       <aside
         className={`
           fixed inset-y-0 left-0 z-30 h-screen
@@ -59,22 +84,16 @@ export default function AppLayout({ onLogout }: Props) {
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
           currentModule={currentModule}
-          onChangeModule={(mod) => {
-            setCurrentModule(mod);
-            setIsSidebarOpen(false); // cierra en mobile al navegar
-          }}
+          onChangeModule={handleChangeModule}
           user={user}
           isAdmin={isAdmin}
           onLogout={handleLogout}
         />
       </aside>
 
-      {/* Contenido principal */}
       <div className="flex flex-1 flex-col min-w-0 h-screen overflow-hidden">
         <HeaderBar
           onOpenSidebar={() => setIsSidebarOpen(true)}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
           user={user}
         />
 
@@ -83,11 +102,24 @@ export default function AppLayout({ onLogout }: Props) {
             module={currentModule}
             searchQuery={searchQuery}
             onAddProduct={() => setShowAddProduct(true)}
+            editingMovement={editingMovement}
+            onClearEdit={() => setEditingMovement(null)}
+            onNavigate={handleNavigate}
           />
         </main>
       </div>
 
       <Toaster position="top-right" />
+
+      {showReauthModal && (
+        <SessionExpiredModal
+          onSessionRestored={() => setShowReauthModal(false)}
+          onLogout={() => {
+            setShowReauthModal(false);
+            handleLogout();
+          }}
+        />
+      )}
     </div>
   );
 }

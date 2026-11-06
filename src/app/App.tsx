@@ -168,6 +168,14 @@ export default function KardexApp() {
     setIsLoggedIn(!!accessToken);
   }, []);
 
+  useEffect(() => {
+    const handleExpired = () => {
+      setIsLoggedIn(false);
+    };
+    window.addEventListener("auth:expired", handleExpired);
+    return () => window.removeEventListener("auth:expired", handleExpired);
+  }, []);
+
   if (!isLoggedIn) {
     return <LoginPage onLoginSuccess={() => setIsLoggedIn(true)} />;
   }

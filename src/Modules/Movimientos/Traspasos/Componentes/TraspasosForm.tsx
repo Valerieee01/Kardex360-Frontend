@@ -1,268 +1,236 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { ArrowLeftRight } from "lucide-react";
-import { toast } from "sonner";
-
-import type {
-  CreateTransferPayload,
-  InventoryTransferItem,
-  SizeItem,
-  Warehouse,
-} from "../Traspasos.types";
-import { getCurrentUserId } from "../../../../app/Shared/auth";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeftRight, Pencil, RotateCcw } from "lucide-react";
+import type { CreateMovementPayload, MovementApiItem, ProductGroup } from "../../Ventas/ventas.types";
+import type { SizeItem } from "../../../Tallas/sizes.types";
+import type { InventoryTransferItem, Warehouse } from "../Traspasos.types";
+import { ProductGroupsEditor } from "../../Componentes/ProductGroupsEditor";
+import { buildProductGroups, createEmptyGroup, flattenGroups } from "../../movimientos.utils";
 
 type Props = {
   inventory: InventoryTransferItem[];
   warehouses: Warehouse[];
   sizes: SizeItem[];
-  responsable: string;
-  loading?: boolean;
-  onCancel: () => void;
-  onSubmit: (payload: CreateTransferPayload) => Promise<void> | void;
+  currentUserId: string;
+  editingMovement: MovementApiItem | null;
+  isCorrection?: boolean;
+  originalCode?: string;
+  onSubmit: (payload: CreateMovementPayload, editingCode?: string) => Promise<void>;
+  onCancelEdit: () => void;
 };
 
-export function TransferForm({
+const buildTraspasoCode = () => {
+  const now = new Date();
+  const s = (n: number, p = 2) => String(n).padStart(p, "0");
+  return `MOV-TRA-${now.getFullYear()}${s(now.getMonth() + 1)}${s(now.getDate())}${s(now.getHours())}${s(now.getMinutes())}${s(now.getSeconds())}`;
+};
+
+export function TraspasosForm({
   inventory,
   warehouses,
   sizes,
-  responsable,
-  loading = false,
-  onCancel,
+  currentUserId,
+  editingMovement,
+  isCorrection = false,
+  originalCode,
   onSubmit,
+  onCancelEdit,
 }: Props) {
-  const [productId, setProductId] = useState<string>("");
-  const [talla, setTalla] = useState<string>("");
-  const [bodegaOrigen, setBodegaOrigen] = useState<string>("");
-  const [bodegaDestino, setBodegaDestino] = useState<string>("");
-  const [cantidad, setCantidad] = useState<number>(0);
-  const [observacion, setObservacion] = useState<string>("");
+  const [codigoMovimiento, setCodigoMovimiento] = useState(buildTraspasoCode());
+  const [bodegaOrigen, setBodegaOrigen] = useState(warehouses[0]?.code ?? "");
+  const [bodegaDestino, setBodegaDestino] = useState(warehouses[1]?.code ?? "");
+  const [observacion, setObservacion] = useState("");
+  const [groups, setGroups] = useState<ProductGroup[]>([createEmptyGroup()]);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (!bodegaOrigen && warehouses.length > 0) {
-      setBodegaOrigen(warehouses[0].code);
-    }
-  }, [warehouses, bodegaOrigen]);
-
-  const selectedProduct = useMemo(
-    () => inventory.find((p) => String(p.id) === String(productId)),
-    [inventory, productId]
+  // Map InventoryTransferItem to FormProductItem shape (valor_unitario → precio_base)
+  const formInventory = useMemo(
+    () => inventory.map((p) => ({ id: p.id, ref: p.ref, desc: p.desc, precio_base: p.valor_unitario })),
+    [inventory]
   );
 
-  const isInvalid =
+  useEffect(() => {
+    if (!editingMovement) {
+      setCodigoMovimiento(buildTraspasoCode());
+      return;
+    }
+    setCodigoMovimiento(editingMovement.codigo_movimiento);
+    setBodegaOrigen(editingMovement.bodega_origen ?? "");
+    setBodegaDestino(editingMovement.bodega_destino ?? "");
+    setObservacion(editingMovement.observacion ?? "");
+    setGroups(buildProductGroups(editingMovement.movimiento_detalle));
+  }, [editingMovement]);
 
-    !selectedProduct ||
-    !talla ||
-    !bodegaOrigen ||
-    !bodegaDestino ||
-    bodegaOrigen === bodegaDestino ||
-    cantidad <= 0;
-
-  const generarCodigoMovimiento = () => {
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const MM = String(now.getMonth() + 1).padStart(2, "0");
-    const dd = String(now.getDate()).padStart(2, "0");
-    const HH = String(now.getHours()).padStart(2, "0");
-    const mm = String(now.getMinutes()).padStart(2, "0");
-    const ss = String(now.getSeconds()).padStart(2, "0");
-
-    return `MOV-TRA-${yyyy}${MM}${dd}${HH}${mm}${ss}`;
-  };
-const handleSubmit = async () => {
-  if (!selectedProduct) return;
-
-  const currentUserId = getCurrentUserId();
-
-  if (!currentUserId) {
-    toast.error("No se encontró el usuario activo.");
-    return;
-  }
-
-  const payload: CreateTransferPayload = {
-    codigo_movimiento: generarCodigoMovimiento(),
-    tipo: "TRASPASO",
-    responsable: currentUserId, // ✅ AQUÍ ESTÁ LA CLAVE
-    bodega_origen: bodegaOrigen,
-    bodega_destino: bodegaDestino,
-    observacion,
-    detalle: [
-      {
-        referencia: selectedProduct.ref,
-        talla,
-        cantidad,
-        valor_unitario: selectedProduct.valor_unitario,
-      },
-    ],
+  const validate = (): string | null => {
+    if (!codigoMovimiento.trim()) return "El código es obligatorio.";
+    if (!bodegaOrigen) return "La bodega origen es obligatoria.";
+    if (!bodegaDestino) return "La bodega destino es obligatoria.";
+    if (bodegaOrigen === bodegaDestino) return "La bodega origen y destino deben ser diferentes.";
+    for (let i = 0; i < groups.length; i++) {
+      const g = groups[i];
+      if (!g.referencia) return `Referencia #${i + 1}: selecciona un producto.`;
+      for (let j = 0; j < g.tallas.length; j++) {
+        const t = g.tallas[j];
+        if (!t.talla) return `Referencia #${i + 1} · talla ${j + 1}: selecciona una talla.`;
+        if (!t.cantidad || t.cantidad <= 0) return `Referencia #${i + 1} · talla ${j + 1}: la cantidad debe ser mayor a 0.`;
+      }
+    }
+    return null;
   };
 
-  await onSubmit(payload);
-};
+  const resetForm = () => {
+    setCodigoMovimiento(buildTraspasoCode());
+    setBodegaOrigen(warehouses[0]?.code ?? "");
+    setBodegaDestino(warehouses[1]?.code ?? "");
+    setObservacion("");
+    setGroups([createEmptyGroup()]);
+  };
 
-    const currentUserId = getCurrentUserId();
-  
+  const handleSubmit = async () => {
+    const error = validate();
+    if (error) { alert(error); return; }
+
+    const payload: CreateMovementPayload = {
+      codigo_movimiento: codigoMovimiento.trim(),
+      tipo: "TRASPASO",
+      responsable: currentUserId,
+      bodega_origen: bodegaOrigen,
+      bodega_destino: bodegaDestino,
+      observacion: observacion.trim(),
+      detalle: flattenGroups(groups),
+    };
+
+    try {
+      setLoading(true);
+      await onSubmit(payload);
+      if (!editingMovement && !isCorrection) resetForm();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Responsable
-          </label>
+    <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-xl font-bold text-gray-900">
+            {isCorrection ? "Corrección de Traspaso" : editingMovement ? "Editar Traspaso" : "Nuevo Traspaso"}
+          </h3>
+          <p className="text-sm text-gray-500">
+            Mueve stock entre bodegas con múltiples referencias y tallas por producto.
+          </p>
+        </div>
+        {(editingMovement || isCorrection) && (
+          <button
+            onClick={onCancelEdit}
+            className="px-4 py-2 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm"
+          >
+            Cancelar
+          </button>
+        )}
+      </div>
+
+      {isCorrection && originalCode && (
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
+          <RotateCcw className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Modo corrección</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              El movimiento <span className="font-mono font-bold">{originalCode}</span> fue anulado.
+              Corrige los datos necesarios y confirma para crear el nuevo movimiento.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Campos generales */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Código movimiento</label>
           <input
-            type="text"
+            value={codigoMovimiento}
+            onChange={(e) => setCodigoMovimiento(e.target.value)}
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm"
+            placeholder="MOV-TRA-..."
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Responsable</label>
+          <input
             value={currentUserId}
             readOnly
-            className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl outline-none text-gray-600"
-            placeholder="Usuario activo"
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Seleccionar Producto
-          </label>
-          <select
-            value={productId}
-            onChange={(e) => setProductId(e.target.value)}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none"
-            disabled={loading}
-          >
-            <option value="">Elija el producto a traspasar</option>
-            {inventory.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.ref} - {p.desc}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Talla
-          </label>
-          <select
-            value={talla}
-            onChange={(e) => setTalla(e.target.value)}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none"
-            disabled={loading}
-          >
-            <option value="">Seleccione talla</option>
-            {sizes.map((size) => (
-              <option key={size.value} value={size.value}>
-                {size.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Cantidad a Trasladar
-          </label>
-          <input
-            type="number"
-            min={1}
-            value={Number.isNaN(cantidad) ? 0 : cantidad}
-            onChange={(e) => setCantidad(Number(e.target.value))}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none"
-            placeholder="0"
-            disabled={loading || !selectedProduct}
+            className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl outline-none text-gray-600 cursor-not-allowed text-sm"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Bodega Origen
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Bodega origen</label>
           <select
             value={bodegaOrigen}
             onChange={(e) => setBodegaOrigen(e.target.value)}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none"
-            disabled={loading}
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm"
           >
             <option value="">Seleccione origen</option>
             {warehouses.map((w) => (
-              <option key={w.code} value={w.code}>
-                {w.name}
-              </option>
+              <option key={w.code} value={w.code}>{w.code} — {w.name}</option>
             ))}
           </select>
         </div>
 
-        <div className="hidden md:flex items-center justify-center pt-8">
-          <ArrowLeftRight className="w-8 h-8 text-blue-900/20" />
-        </div>
-
-        <div className="hidden md:block" />
-
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Bodega Destino
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <span className="inline-flex items-center gap-1.5">
+              <ArrowLeftRight size={14} className="text-blue-900" />
+              Bodega destino
+            </span>
           </label>
           <select
             value={bodegaDestino}
             onChange={(e) => setBodegaDestino(e.target.value)}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none"
-            disabled={loading}
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm"
           >
             <option value="">Seleccione destino</option>
             {warehouses.map((w) => (
-              <option key={w.code} value={w.code}>
-                {w.name}
-              </option>
+              <option key={w.code} value={w.code}>{w.code} — {w.name}</option>
             ))}
           </select>
-
           {bodegaOrigen && bodegaDestino && bodegaOrigen === bodegaDestino && (
-            <p className="text-sm text-red-500 mt-2">
-              La bodega destino debe ser diferente a la bodega origen.
+            <p className="text-xs text-red-500 mt-1.5">
+              La bodega destino debe ser diferente a la de origen.
             </p>
           )}
         </div>
 
         <div className="md:col-span-2">
-          <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
-            <p className="text-xs text-gray-500 mb-1">Precio del producto seleccionado</p>
-            <p className="font-semibold text-gray-800">
-              {selectedProduct
-                ? `$ ${Number(selectedProduct.valor_unitario || 0).toLocaleString("es-CO")}`
-                : "-"}
-            </p>
-          </div>
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Observaciones / Motivo
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Observaciones / Motivo</label>
           <textarea
             value={observacion}
             onChange={(e) => setObservacion(e.target.value)}
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none min-h-[100px]"
+            rows={2}
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm resize-none"
             placeholder="Ej: Reabastecimiento de sucursal centro..."
-            disabled={loading}
           />
         </div>
       </div>
 
-      <div className="mt-8 flex items-center justify-end gap-4">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={loading}
-          className="px-6 py-3 text-gray-600 font-semibold hover:bg-gray-100 rounded-xl transition-all disabled:opacity-50"
-        >
-          Cancelar
-        </button>
+      {/* Editor de grupos */}
+      <ProductGroupsEditor
+        groups={groups}
+        onChange={setGroups}
+        inventory={formInventory}
+        sizes={sizes}
+      />
 
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={loading || isInvalid}
-          className="px-8 py-3 bg-blue-900 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50"
-        >
-          {loading ? "Procesando..." : "Ejecutar Traspaso"}
-        </button>
-      </div>
+      {/* Botón submit */}
+      <button
+        onClick={handleSubmit}
+        disabled={loading}
+        className="w-full py-4 bg-blue-900 hover:bg-blue-800 disabled:opacity-60 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2"
+      >
+        {isCorrection ? <RotateCcw size={18} /> : editingMovement ? <Pencil size={18} /> : null}
+        {loading ? "Procesando..." : isCorrection ? "Confirmar corrección" : "Ejecutar traspaso"}
+      </button>
     </div>
   );
 }

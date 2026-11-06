@@ -1,44 +1,37 @@
-import axios from "axios";
+import { http } from "../app/Shared/http";
 import type {
   ReportFilters,
   ReportChartRow,
   ReportSummaryResponse,
   UserMovementsResponse,
   ReportTotals,
-  ReportSummaryItem,
 } from "../Modules/Reportes/Reportes.types";
-
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-});
 
 function mapMovementType(type: ReportFilters["movementType"]) {
   switch (type) {
-    case "VENTAS":
-      return "VENTA";
-    case "TRASPASOS":
-      return "TRASPASO";
-    case "ENTRADAS":
-      return "ENTRADA";
-    default:
-      return "TODOS";
+    case "VENTAS":    return "VENTA";
+    case "TRASPASOS": return "TRASPASO";
+    case "ENTRADAS":  return "ENTRADA";
+    default:          return undefined;
   }
-}
-
-function mapWarehouse(warehouse: string) {
-  return warehouse === "ALL" ? "TODAS" : warehouse;
 }
 
 export function buildReportQuery(filters: ReportFilters) {
   const params = new URLSearchParams();
 
   if (filters.dateFrom) params.append("fechaDesde", filters.dateFrom);
+  if (filters.dateTo)   params.append("fechaHasta", filters.dateTo);
+
   if (filters.warehouse && filters.warehouse !== "ALL") {
-    params.append("bodega", mapWarehouse(filters.warehouse));
+    params.append("bodega", filters.warehouse);
   }
-  if (filters.movementType && filters.movementType !== "ALL") {
-    params.append("tipo", mapMovementType(filters.movementType));
+
+  if (filters.userId && filters.userId !== "ALL") {
+    params.append("responsable", filters.userId);
   }
+
+  const tipo = mapMovementType(filters.movementType);
+  if (tipo) params.append("tipo", tipo);
 
   return params.toString();
 }
@@ -49,9 +42,9 @@ export async function getSummaryReport(filters: ReportFilters) {
     ? `/reportes/movimientos/resumen?${query}`
     : `/reportes/movimientos/resumen`;
 
-  const { data } = await api.get<ReportSummaryResponse>(url);
+  const data = await http.get<ReportSummaryResponse>(url);
 
-  const chartData: ReportChartRow[] = data.data.chart.map((item) => ({
+  const chartData: ReportChartRow[] = (data as any).data.chart.map((item: any) => ({
     name: item.dia,
     ventas: item.ventas,
     traspasos: item.traspasos,
@@ -59,16 +52,16 @@ export async function getSummaryReport(filters: ReportFilters) {
   }));
 
   const totals: ReportTotals = {
-    registros: data.data.totales.registros,
-    cantidad: data.data.totales.cantidad,
-    valorEstimado: data.data.totales.valor_estimado,
+    registros: (data as any).data.totales.registros,
+    cantidad: (data as any).data.totales.cantidad,
+    valorEstimado: (data as any).data.totales.valor_estimado,
   };
 
   return {
     raw: data,
     chartData,
     totals,
-    items: data.data.items,
+    items: (data as any).data.items,
   };
 }
 
@@ -78,24 +71,20 @@ export async function getUserMovementsReport(
 ) {
   const params = new URLSearchParams();
 
+  if (filters.dateFrom) params.append("fechaDesde", filters.dateFrom);
+  if (filters.dateTo)   params.append("fechaHasta", filters.dateTo);
+
   if (filters.warehouse && filters.warehouse !== "ALL") {
-    params.append("bodega", mapWarehouse(filters.warehouse));
+    params.append("bodega", filters.warehouse);
   }
 
-  if (filters.movementType && filters.movementType !== "ALL") {
-    params.append("tipo", mapMovementType(filters.movementType));
-  }
-
-  if (filters.dateFrom) {
-    params.append("fechaDesde", filters.dateFrom);
-  }
+  const tipo = mapMovementType(filters.movementType);
+  if (tipo) params.append("tipo", tipo);
 
   const query = params.toString();
-
   const url = query
     ? `/reportes/usuarios/${identificacion}/movimientos?${query}`
     : `/reportes/usuarios/${identificacion}/movimientos`;
 
-  const { data } = await api.get<UserMovementsResponse>(url);
-  return data;
+  return http.get<UserMovementsResponse>(url);
 }

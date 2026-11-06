@@ -9,6 +9,7 @@ function mapApiToUi(item: WarehouseApi): WarehouseItem {
     name: item.nombre_bodega,
     location: item.ubicacion,
     estado: item.estado,
+    totalUnidades: item.total_unidades,
   };
 }
 
@@ -20,6 +21,17 @@ function mapUiToApi(item: Partial<WarehouseItem>): Partial<WarehouseApi> {
     estado: item.estado,
   };
 }
+
+export type WarehouseStockItem = {
+  referencia: string;
+  talla: string;
+  cantidad: number;
+  productos: {
+    descripcion: string;
+    imagen_url: string | null;
+    precio_base: number;
+  };
+};
 
 export const warehouseService = {
   async getAll(): Promise<WarehouseItem[]> {
@@ -47,5 +59,10 @@ export const warehouseService = {
 
   async remove(id: number | string): Promise<void> {
     await http.del(`/bodegas/eliminar/${id}`);
+  },
+
+  async getStock(id: number | string): Promise<WarehouseStockItem[]> {
+    const res = await http.get<any>(`/bodegas/${id}/stock`);
+    return res.data ?? res;
   },
 };

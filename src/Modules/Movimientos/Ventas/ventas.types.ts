@@ -9,6 +9,21 @@ export type InventoryItem = {
   id: string;
   ref: string;
   desc: string;
+  precio_base?: number;
+  imagen_url?: string;
+};
+
+export type TallaRow = {
+  id: string;
+  talla: string;
+  cantidad: number;
+};
+
+export type ProductGroup = {
+  id: string;
+  referencia: string;
+  valor_unitario: number;
+  tallas: TallaRow[];
 };
 
 export type MovementDetailForm = {
@@ -21,7 +36,7 @@ export type MovementDetailForm = {
 
 export type CreateMovementPayload = {
   codigo_movimiento: string;
-  tipo: "VENTA" | "ENTRADA";
+  tipo: "VENTA" | "ENTRADA" | "TRASPASO";
   responsable: string;
   bodega_origen: string | null;
   bodega_destino: string | null;
@@ -71,6 +86,9 @@ export type SaleRow = {
   tipo: MovementType;
   responsable: string;
   ref: string;
+  desc?: string;
+  imagen_url?: string;
+  talla: string;
   qty: number;
   price: number;
   total: number;

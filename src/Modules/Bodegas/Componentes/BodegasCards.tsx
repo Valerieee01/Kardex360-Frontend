@@ -1,17 +1,19 @@
-import { Pencil, Trash2, Warehouse } from "lucide-react";
+import { Pencil, Trash2, Warehouse, Package } from "lucide-react";
 import type { WarehouseItem } from "../BodegasTypes";
 
 type Props = {
   warehouse: WarehouseItem;
   onEdit: (warehouse: WarehouseItem) => void;
   onDelete: (warehouse: WarehouseItem) => void;
+  onViewStock: (warehouse: WarehouseItem) => void;
 };
 
-export function WarehouseCard({ warehouse, onEdit, onDelete }: Props) {
-  const capacity = warehouse.capacityPct ?? 85;
-
+export function WarehouseCard({ warehouse, onEdit, onDelete, onViewStock }: Props) {
   return (
-    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
+    <div
+      className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group cursor-pointer"
+      onClick={() => onViewStock(warehouse)}
+    >
       <div className="flex items-start justify-between mb-4">
         <div className="p-3 bg-blue-50 text-blue-900 rounded-xl group-hover:bg-blue-900 group-hover:text-white transition-colors">
           <Warehouse className="w-6 h-6" />
@@ -19,7 +21,7 @@ export function WarehouseCard({ warehouse, onEdit, onDelete }: Props) {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => onEdit(warehouse)}
+            onClick={(e) => { e.stopPropagation(); onEdit(warehouse); }}
             className="p-2 rounded-lg text-gray-400 hover:text-blue-700 hover:bg-blue-50"
             title="Editar"
           >
@@ -27,7 +29,7 @@ export function WarehouseCard({ warehouse, onEdit, onDelete }: Props) {
           </button>
 
           <button
-            onClick={() => onDelete(warehouse)}
+            onClick={(e) => { e.stopPropagation(); onDelete(warehouse); }}
             className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
             title="Eliminar"
           >
@@ -56,13 +58,13 @@ export function WarehouseCard({ warehouse, onEdit, onDelete }: Props) {
       </div>
 
       <div className="mt-6 pt-6 border-t border-gray-50 flex items-center justify-between">
-        <div className="text-xs text-gray-400">
-          Capacidad: <span className="text-gray-900 font-semibold">{capacity}%</span>
+        <div className="flex items-center gap-1.5 text-xs text-gray-400">
+          <Package className="w-3.5 h-3.5" />
+          Unidades en stock
         </div>
-
-        <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-          <div className="h-full bg-blue-900" style={{ width: `${capacity}%` }} />
-        </div>
+        <span className="text-sm font-bold text-blue-900">
+          {warehouse.totalUnidades ?? 0}
+        </span>
       </div>
     </div>
   );

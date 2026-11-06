@@ -88,53 +88,40 @@ function toApiError(status: number, data: any, url?: string): ApiError {
   return { status, message, details: data, url };
 }
 
-// ---- Refresh token flow (opcional) ----
-let refreshingPromise: Promise<string | null> | null = null;
+// ---- Re-auth queue ----
+// When a 401 occurs, all concurrent requests pause here until the user
+// re-enters their password. Once resolved they all retry with the new token.
 
-/**
- * Implementa esto si ya tienes endpoint de refresh.
- * Ejemplo: POST /auth/refresh  { refreshToken }
- * Retorna { accessToken, refreshToken? }
- */
-async function refreshAccessToken(): Promise<string | null> {
-  const { refreshToken } = getTokens();
-  if (!refreshToken) return null;
+type ReauthWaiter = {
+  resolve: (token: string) => void;
+  reject: (err: unknown) => void;
+};
 
-  // Evita 10 refresh al mismo tiempo
-  if (refreshingPromise) return refreshingPromise;
+let reauthQueue: ReauthWaiter[] | null = null;
 
-  refreshingPromise = (async () => {
-    try {
-      const url = buildUrl("/auth/refresh");
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken }),
-      });
+function waitForReauth(): Promise<string> {
+  if (!reauthQueue) {
+    // First 401 — open the queue and fire the event so the UI shows the modal
+    reauthQueue = [];
+    window.dispatchEvent(new CustomEvent("auth:reauth-required"));
+  }
+  return new Promise<string>((resolve, reject) => {
+    reauthQueue!.push({ resolve, reject });
+  });
+}
 
-      const data = await readResponse(res);
+/** Called by SessionExpiredModal after a successful re-login */
+export function resolveReauth(newToken: string) {
+  const queue = reauthQueue;
+  reauthQueue = null;
+  queue?.forEach((w) => w.resolve(newToken));
+}
 
-      if (!res.ok) {
-        clearTokens();
-        return null;
-      }
-
-      // Ajusta nombres según tu backend
-      const newAccess = data?.accessToken ?? data?.token ?? null;
-      const newRefresh = data?.refreshToken ?? refreshToken;
-
-      setTokens({ accessToken: newAccess, refreshToken: newRefresh });
-
-      return newAccess;
-    } catch {
-      clearTokens();
-      return null;
-    } finally {
-      refreshingPromise = null;
-    }
-  })();
-
-  return refreshingPromise;
+/** Called by SessionExpiredModal when the user chooses to log out */
+export function cancelReauth() {
+  const queue = reauthQueue;
+  reauthQueue = null;
+  queue?.forEach((w) => w.reject(new Error("auth:cancelled")));
 }
 
 // ---- Core request ----
@@ -184,15 +171,18 @@ export async function request<TResponse = any, TBody = any>(
     signal,
   });
 
-  // Si 401, intenta refresh (si está habilitado)
+  // Si 401, pausa la petición y espera a que el usuario se re-autentique
   if (res.status === 401 && auth && retryAuth) {
-    const newToken = await refreshAccessToken();
-    if (newToken) {
+    try {
+      const newToken = await waitForReauth();
       return request<TResponse, TBody>(path, {
         ...options,
-        retryAuth: false, // evita loop infinito
+        retryAuth: false,
         headers: { ...headers, Authorization: `Bearer ${newToken}` },
       });
+    } catch {
+      // Usuario canceló la re-autenticación
+      throw toApiError(401, { message: "Sesión expirada" }, url);
     }
   }
 

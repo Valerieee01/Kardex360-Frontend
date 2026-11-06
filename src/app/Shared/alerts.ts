@@ -33,3 +33,26 @@ export const errorAlert = (message: string) => {
     text: message,
   });
 };
+
+export const confirmWithReason = async (
+  title: string,
+  text: string,
+  placeholder = "Escribe el motivo..."
+): Promise<string | null> => {
+  const result = await Swal.fire({
+    title,
+    text,
+    input: "text",
+    inputPlaceholder: placeholder,
+    showCancelButton: true,
+    confirmButtonColor: "#1e3a8a",
+    cancelButtonColor: "#d33",
+    confirmButtonText: "Confirmar",
+    cancelButtonText: "Cancelar",
+    reverseButtons: true,
+    inputValidator: (value) => {
+      if (!value?.trim()) return "El motivo es obligatorio";
+    },
+  });
+  return result.isConfirmed ? (result.value as string).trim() : null;
+};

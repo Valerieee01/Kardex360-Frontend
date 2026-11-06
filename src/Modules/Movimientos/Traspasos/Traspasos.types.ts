@@ -3,16 +3,12 @@ export type InventoryTransferItem = {
   ref: string;
   desc: string;
   valor_unitario: number;
+  imagen_url?: string;
 };
 
 export type Warehouse = {
   code: string;
   name: string;
-};
-
-export type SizeItem = {
-  value: string;
-  label: string;
 };
 
 export type TransferDetail = {

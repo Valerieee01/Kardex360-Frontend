@@ -17,6 +17,8 @@ type ProductosResponseItem = {
   codigo?: string;
   descripcion?: string;
   nombre?: string;
+  precio_base?: string | number;
+  imagen_url?: string;
 };
 
 type BodegasResponseItem = {
@@ -26,6 +28,7 @@ type BodegasResponseItem = {
   name?: string;
   codigo_bodega?: string;
   nombre_bodega?: string;
+  estado?: boolean;
 };
 
 export async function listProductsForMovementService() {
@@ -42,6 +45,8 @@ export async function listProductsForMovementService() {
     id: String(item.id ?? index + 1),
     ref: item.referencia ?? item.codigo ?? "",
     desc: item.descripcion ?? item.nombre ?? "",
+    precio_base: item.precio_base !== undefined ? Number(item.precio_base) : undefined,
+    imagen_url: item.imagen_url ?? "",
   }));
 }
 
@@ -59,8 +64,10 @@ export async function listWarehousesForMovementService() {
     .map((item) => ({
       code: item.codigo ?? item.code ?? item.codigo_bodega ?? "",
       name: item.nombre ?? item.name ?? item.nombre_bodega ?? "",
+      estado: item.estado,
     }))
-    .filter((item) => item.code && item.name);
+    .filter((item) => item.code && item.name && item.estado !== false)
+    .map(({ estado: _, ...w }) => w);
 }
 
 export async function listMovementsService(
@@ -70,7 +77,7 @@ export async function listMovementsService(
 
   const response = await http.get<
     ApiResponse<MovementApiItem[]>
-  >(`/movimientos/listar`);
+  >(`/movimientos/listar${query}`);
 
   const data = response.data || [];
 
